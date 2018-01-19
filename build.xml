@@ -1,0 +1,118 @@
+<project name="mutation-testing" default="run" basedir="." >
+
+  <property name="resource_dir" value="${basedir}/lib/"/>
+  <property name="report_dir" value="${basedir}/reports/"/>
+  <property name="bin_dir" value="${basedir}/bin/"/>
+  <property name="pit_reports" value="${basedir}/pitReports" />
+  <!-- timeout is in milliseconds -->
+  <property name="exec.timeout" value="120000"/>
+  <property name="build.compiler" value="modern"/>
+  <!-- classpath for running the tests (project files and test libraries) -->
+  <path id="mutation.classpath">
+    <pathelement location="${resource_dir}/JavaTddPluginSupport.jar"/>
+    <pathelement location="${resource_dir}/junit-4.9.jar"/>
+    <pathelement location="${resource_dir}/student.jar"/>
+    <pathelement location="${bin_dir}"/>
+  </path>
+
+  <!-- classpath for pitest and its dependencies (including test libraries)-->
+  <path id="pitest.path">
+    <pathelement location="lib/junit-4.9.jar" />
+    <pathelement location="lib/xstream-1.4.8.jar" />
+    <pathelement location="lib/xmlpull-1.1.3.1.jar" />
+    <pathelement location="lib/pitest-1.3.1.jar" />
+    <pathelement location="lib/pitest-entry-1.3.1.jar" />
+    <pathelement location="lib/pitest-ant-1.3.1.jar" />
+    <pathelement location="${resource_dir}/junit-4.9.jar"/>
+    <pathelement location="${resource_dir}/student.jar"/>
+  </path>
+
+  <taskdef name="pitest" classname="org.pitest.ant.PitestTask" classpathref="pitest.path" />
+
+  <!-- delete output from previous runs -->
+  <target name="clean">
+    <delete dir="${bin_dir}" />
+    <delete dir="${report_dir}" />
+    <delete dir="${pit_reports}" />
+  </target>
+
+  <!-- compile project files -->
+  <target name="compile" depends="clean">
+    <mkdir dir="${report_dir}"/>
+    <mkdir dir="${bin_dir}"/>
+    <record name="${report_dir}/compile.log" action="start"/>
+    <javac
+      srcdir="src/"
+      destdir="${bin_dir}"
+      debug="true"
+      debuglevel="lines,vars,source"
+      includeAntRuntime="false">
+      <classpath refid="mutation.classpath"/>
+      <compilerarg value="-Xlint:unchecked"/>
+      <compilerarg value="-Xlint:empty"/>
+      <compilerarg value="-Xlint:fallthrough"/>
+    </javac>
+    <record name="${report_dir}/compile.log" action="stop"/>
+  </target>
+
+  <!-- run the unit tests and write results to csv --> 
+  <target name="run" depends="compile">
+    <junit printsummary="off"
+      haltonerror="no"
+      haltonfailure="no"
+      filtertrace="no"
+      timeout="${exec.timeout}"
+      tempdir="./" >
+      <classpath refid="mutation.classpath"/>
+      <jvmarg value="-ea"/>
+      <sysproperty key="java.security.manager" value=""/>
+      <sysproperty key="student.TestCase.trimStackTraces" value="true"/>
+      <sysproperty key="java.security.policy" value="=file:${resource_dir}/java.policy"/>
+      <sysproperty key="report_dir" value="${report_dir}"/>
+      <sysproperty key="resource_dir" value="${resource_dir}"/>
+      <sysproperty key="ant.home" value="${ant.home}"/>
+      <sysproperty key="student.TestCase.trimStackTraces" value="false"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.ceiling" value="3000"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.maximum" value="4000"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.logfile" value="${report_dir}/timeout.csv"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.user" value="${user.dir}"/>
+      <sysproperty key="net.sf.webcat.plugins.javatddplugin.CsvJUnitResultFormatter.prefix" value="${user.dir}"/>
+      <formatter
+        classname="net.sf.webcat.plugins.javatddplugin.CsvJUnitResultFormatter"
+        extension=".csv"/>
+      <formatter
+        classname="net.sf.webcat.plugins.javatddplugin.BasicJUnitResultFormatter"
+        extension="-results.txt"/>
+      <formatter
+        classname="net.sf.webcat.plugins.javatddplugin.OutputCaptureJUnitResultFormatter"
+        extension="-out.txt"/>
+      <batchtest todir="${report_dir}">
+        <fileset dir="src/">
+          <include name="**/*Test.java"/>
+          <include name="**/*Tests.java"/>
+          <exclude name="**/Abstract*"/>
+          <exclude name="reports/"/>
+        </fileset>
+      </batchtest>
+    </junit>
+    <concat destfile="${report_dir}/results.csv">
+      <fileset dir="${report_dir}" includes="*.csv" excludes="results.csv"/>
+    </concat>
+  </target>
+
+  <!-- run PIT mutation testing -->
+  <target name="pit" depends="compile">
+    <pitest pitClasspath="pitest.path"
+      threads="2"
+      classPath="mutation.classpath"
+      targetTests="com.example.*Test*"
+      targetClasses="com.example.*"
+      excludedClasses="com.example.*Test*"
+      reportDir="${pit_reports}"
+      timestampedReports="false"
+      sourceDir="src"
+      outputFormats="HTML,CSV"
+      />
+  </target>
+
+</project>
