@@ -1,12 +1,13 @@
-<project name="mutation-testing" default="run" basedir="." >
+<project name="mutation-testing" default="run">
 
-  <property name="resource_dir" value="${basedir}/../../lib"/>
   <property name="report_dir" value="${basedir}/reports/"/>
   <property name="bin_dir" value="${basedir}/bin/"/>
   <property name="pit_reports" value="${basedir}/pitReports" />
   <!-- timeout is in milliseconds -->
   <property name="exec.timeout" value="120000"/>
   <property name="build.compiler" value="modern"/>
+  <echo message="resource_dir = ${resource_dir}" />
+  <echo message="basedir = ${basedir}" />
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
     <pathelement location="${resource_dir}/JavaTddPluginSupport.jar"/>
@@ -112,6 +113,7 @@
       timestampedReports="false"
       sourceDir="src"
       outputFormats="HTML,CSV"
+      mutators="REMOVE_CONDITIONALS"
       />
   </target>
 
