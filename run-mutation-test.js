@@ -1,33 +1,42 @@
 #! /usr/bin/env node
 
+/*
+ * Author: Ayaan Kazerouni <ayaan@vt.edu>
+ * Description: Run mutation analysis on a single project.
+ *
+ * Overview:
+ *  - Copy project to /tmp/
+ *  - Create artificial package structure so that
+ *    PIT doesn't try to mutate itself
+ *  - Run PIT from the ANT build file (assumed to be in the current directory)
+ * 
+ * Dependencies:
+ *  - npm install fs-extra, util-promisify
+ *  - or simple npm install if you have package.json or package-lock.json
+ */
+
 'use strict';
 
 const path = require('path');
 const fs = require('fs-extra');
-const getopt = require('node-getopt');
 const promisify = require('util-promisify');
 const exec = promisify(require('child_process').exec);
 
-var opts = getopt.create([
-  ['p', 'projectPath=ARG', 'Path to a single Java project'],
-  ['m', '', 'Is projectPath pointing to a directory with multiple projects?'],
-  ['t', 'antTask=ARG', 'ANT task to run on project(s). Should be defined in the shared build.xml.'],
-  ['o', 'suppressOut', 'Switch to suppress stdout'],
-  ['e', 'suppressErr', 'Switch to suppress stderr'],
-  ['h', 'help', 'Display this help']
-])
-.bindHelp()
-.parseSystem();
+const argFile = process.argv[2];
+if (!argFile) {
+  console.error('Error, no args :-(');
+  process.exit(1);
+}
 
-const projectPath = opts.options['projectPath'];
-const manyProjects = opts.options['m'];
-const task = opts.options['antTask'] || 'run';
-const suppressOut = opts.options['suppressOut'];
-const suppressErr = opts.options['suppressErr'];
+const opts = JSON.parse(fs.readFileSync(argFile, 'utf-8'));
+const projectPath = opts.projectPath;
+const task = opts.task;
+const suppressOut = opts.suppressOut;
+const suppressErr = opts.suppressErr;
 
 function testSingleProject(projectPath) {
   // copy the project to /tmp/ to avoid modifying the original
-  const clonePath = path.join('/tmp/', projectPath); 
+  const clonePath = path.join('/tmp/', path.basename(projectPath)); 
   const src = path.join(clonePath, 'src');
   const pkg = path.join(src, 'com', 'example');
 
@@ -61,8 +70,8 @@ function testSingleProject(projectPath) {
   });
 }
 
-if (manyProjects) {
-  console.log('Processing multiple projects is not yet implemented.');
-} else {
+try {
   testSingleProject(projectPath);
+} catch(error) {
+  console.error(error);
 }
