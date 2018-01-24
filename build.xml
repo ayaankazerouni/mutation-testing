@@ -102,7 +102,7 @@
   </target>
 
   <!-- run PIT mutation testing -->
-  <target name="pit" depends="compile">
+  <target name="pit" depends="run">
     <pitest pitClasspath="pitest.path"
       threads="2"
       classPath="mutation.classpath"

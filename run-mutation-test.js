@@ -6,7 +6,7 @@
  *
  * Overview:
  *  - Copy project to /tmp/
- *  - Create artificial package structure so that
+ *  - Create artificial package structure for the project so that
  *    PIT doesn't try to mutate itself
  *  - Run PIT from the ANT build file (assumed to be in the current directory)
  * 
@@ -36,7 +36,7 @@ const suppressErr = opts.suppressErr;
 
 function testSingleProject(projectPath) {
   // copy the project to /tmp/ to avoid modifying the original
-  const clonePath = path.join('/tmp/', path.basename(projectPath)); 
+  const clonePath = path.join('/tmp/mutation-testing', path.basename(projectPath)); 
   const src = path.join(clonePath, 'src');
   const pkg = path.join(src, 'com', 'example');
 
