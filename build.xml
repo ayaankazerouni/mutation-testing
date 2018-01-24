@@ -113,7 +113,7 @@
       timestampedReports="false"
       sourceDir="src"
       outputFormats="HTML,CSV"
-      mutators="REMOVE_CONDITIONALS"
+      mutators="REMOVE_CONDITIONALS,CONDITIONALS_BOUNDARY,NEGATE_CONDITIONALS,MATH,INCREMENTS,INVERT_NEGS,RETURN_VALS,VOID_METHOD_CALLS"
       />
   </target>
 
