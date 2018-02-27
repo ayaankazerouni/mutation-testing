@@ -6,8 +6,13 @@
   <!-- timeout is in milliseconds -->
   <property name="exec.timeout" value="120000"/>
   <property name="build.compiler" value="modern"/>
+
   <echo message="resource_dir = ${resource_dir}" />
   <echo message="basedir = ${basedir}" />
+
+  <!-- for static analysis and filtering -->
+  <property name="instrumentExclusionPattern" value="none"/>
+
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
     <pathelement location="${resource_dir}/JavaTddPluginSupport.jar"/>
@@ -54,6 +59,23 @@
       <compilerarg value="-Xlint:fallthrough"/>
     </javac>
     <record name="${report_dir}/compile.log" action="stop"/>
+  </target>
+
+  <!-- this is not stable yet. don't use this task -->
+  <target name="instrument.code" depends="compile" />
+    <mkdir dir="${bin_dir}"/>
+    <copy todir="${bin_dir}">
+      <fileset dir="${bin_dir}.raw"
+        includes="${instrumentExclusionPattern}"/>
+  	</copy>
+    <taskdef resource="org/jacoco/ant/antlib.xml">
+      <classpath path="${resource_dir}/jacocoant.jar"/>
+    </taskdef>
+    <instrument destdir="${bin_dir}">
+      <fileset dir="${bin_dir}.raw"
+        includes="**/*.class"
+        excludes="${instrumentExclusionPattern}"/>
+    </instrument>
   </target>
 
   <!-- run the unit tests and write results to csv --> 
