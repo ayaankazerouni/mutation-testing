@@ -1,2 +1,5 @@
 projects/*
 lib/
+*.ipynb
+__pycache__/
+tasks.json
