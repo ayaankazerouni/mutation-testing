@@ -12,9 +12,6 @@
 
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
-    <pathelement location="${resource_dir}/JavaTddPluginSupport.jar"/>
-    <pathelement location="${resource_dir}/junit-4.9.jar"/>
-    <pathelement location="${resource_dir}/student.jar"/>
     <pathelement location="${bin_dir}"/>
   </path>
 
@@ -27,7 +24,6 @@
     <pathelement location="${resource_dir}/pitest-entry-1.3.2.jar" />
     <pathelement location="${resource_dir}/pitest-ant-1.3.2.jar" />
     <pathelement location="${resource_dir}/commons-codec-1.11.jar" />
-    <pathelement location="${resource_dir}/junit-4.9.jar"/>
     <pathelement location="${resource_dir}/student.jar"/>
   </path>
 
@@ -126,9 +122,10 @@
     <pitest pitClasspath="pitest.path"
       threads="2"
       classPath="mutation.classpath"
-      targetTests="*Test*"
-      targetClasses="com.example.*"
-      excludedClasses="com.example.*Test*"
+      targetTests="*Test,Test*"
+      targetClasses="*"
+      includeLaunchClasspath="false"
+      excludedClasses="*Test,Test*"
       reportDir="${pit_reports}"
       timestampedReports="false"
       sourceDir="src"

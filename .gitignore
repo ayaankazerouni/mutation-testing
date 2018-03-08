@@ -9,3 +9,5 @@ __pycache__/
 .RData
 data/*
 .Rproj.user
+
+*-notebook.html
