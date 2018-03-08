@@ -3,3 +3,9 @@ lib/
 *.ipynb
 __pycache__/
 tasks.json
+
+*.Rproj*
+.Rhistory
+.RData
+data/*
+.Rproj.user

@@ -9,6 +9,7 @@
 
   <echo message="resource_dir = ${resource_dir}" />
   <echo message="basedir = ${basedir}" />
+  <echo message="userdir = ${user.dir}" />
 
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
@@ -23,9 +24,10 @@
     <pathelement location="${resource_dir}/junit-4.9.jar" />
     <pathelement location="${resource_dir}/xstream-1.4.8.jar" />
     <pathelement location="${resource_dir}/xmlpull-1.1.3.1.jar" />
-    <pathelement location="${resource_dir}/pitest-1.3.1.jar" />
-    <pathelement location="${resource_dir}/pitest-entry-1.3.1.jar" />
-    <pathelement location="${resource_dir}/pitest-ant-1.3.1.jar" />
+    <pathelement location="${resource_dir}/pitest-1.3.2.jar" />
+    <pathelement location="${resource_dir}/pitest-entry-1.3.2.jar" />
+    <pathelement location="${resource_dir}/pitest-ant-1.3.2.jar" />
+    <pathelement location="${resource_dir}/commons-codec-1.11.jar" />
     <pathelement location="${resource_dir}/junit-4.9.jar"/>
     <pathelement location="${resource_dir}/student.jar"/>
   </path>
@@ -104,11 +106,11 @@
   </target>
 
   <!-- run PIT mutation testing -->
-  <target name="pit" depends="run">
+  <target name="pit" depends="compile">
     <pitest pitClasspath="pitest.path"
       threads="2"
       classPath="mutation.classpath"
-      targetTests="com.example.*Test*"
+      targetTests="*Test*"
       targetClasses="com.example.*"
       excludedClasses="com.example.*Test*"
       reportDir="${pit_reports}"

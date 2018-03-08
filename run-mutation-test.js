@@ -59,10 +59,10 @@ function testSingleProject(projectPath) {
     const antPath = path.join(__dirname, 'build.xml'); // path to shared build file
     const libPath = path.join(__dirname, 'lib'); // path to shared libraries required to test projects
 
-    return exec(`ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath}  ${task}`); 
+    return exec(`ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} ${task}`); 
   })
   .then((result) => { // this is an object
-    if (!suppressOut) console.log(`stdout: ${result.stdout}`);
+    if (!suppressOut) console.log(`stdout: ${result.stdout.toString()}`);
     if (!suppressErr) console.log(`stderr: ${result.stderr || 'None'}`);
   })
   .catch((err) => {
