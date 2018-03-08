@@ -42,22 +42,22 @@ function testSingleProject(projectPath) {
 
   fs.copy(projectPath, clonePath)
   // Create artificial package structure so PIT doesn't try to mutate itself
-  .then(() => {
-    // Create src/com/example
-    return fs.mkdirp(pkg);
-  })
-  .then(() => {
-    // Move Java files into src/com/example
-    return exec(`mv ${path.join(src, '*.java')} ${pkg}`);
-  })
-  .then(() => {
-    // Add the package declaration to the top of Java files
-    return exec(`sed -i '1ipackage com.example;' ${path.join(pkg, '*.java')}`);
-  })
+  // .then(() => {
+  //   // Create src/com/example
+  //   return fs.mkdirp(pkg);
+  // })
+  // .then(() => {
+  //   // Move Java files into src/com/example
+  //   return exec(`mv ${path.join(src, '*.java')} ${pkg}`);
+  // })
+  // .then(() => {
+  //   // Add the package declaration to the top of Java files
+  //   return exec(`sed -i '1ipackage com.example;' ${path.join(pkg, '*.java')}`);
+  // })
   .then(() => {
     // run ANT
     const antPath = path.join(__dirname, 'build.xml'); // path to shared build file
-    const libPath = path.join(__dirname, 'lib'); // path to shared libraries required to test projects
+    const libPath = path.join(__dirname, 'lib'); // path to shared libraries 
 
     return exec(`ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} ${task}`); 
   })

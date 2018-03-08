@@ -1,6 +1,8 @@
 ---
 title: "Mutation Testing"
-output: html_document
+output:
+  html_document: default
+  html_notebook: default
 ---
 ```{r include=FALSE}
 # Load libraries

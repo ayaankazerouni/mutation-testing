@@ -12,6 +12,9 @@
 
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
+    <pathelement location="${resource_dir}/JavaTddPluginSupport.jar" />
+    <pathelement location="${resource_dir}/junit-4.9.jar" />
+    <pathelement location="${resource_dir}/student.jar" />
     <pathelement location="${bin_dir}"/>
   </path>
 
@@ -55,23 +58,6 @@
     <record name="${report_dir}/compile.log" action="stop"/>
   </target>
 
-  <!-- this is not stable yet. don't use this task -->
-  <target name="instrument.code" depends="compile" />
-    <mkdir dir="${bin_dir}"/>
-    <copy todir="${bin_dir}">
-      <fileset dir="${bin_dir}.raw"
-        includes="${instrumentExclusionPattern}"/>
-  	</copy>
-    <taskdef resource="org/jacoco/ant/antlib.xml">
-      <classpath path="${resource_dir}/jacocoant.jar"/>
-    </taskdef>
-    <instrument destdir="${bin_dir}">
-      <fileset dir="${bin_dir}.raw"
-        includes="**/*.class"
-        excludes="${instrumentExclusionPattern}"/>
-    </instrument>
-  </target>
-
   <!-- run the unit tests and write results to csv --> 
   <target name="run" depends="compile">
     <junit printsummary="off"
@@ -105,8 +91,7 @@
         extension="-out.txt"/>
       <batchtest todir="${report_dir}">
         <fileset dir="src/">
-          <include name="**/*Test.java"/>
-          <include name="**/*Tests.java"/>
+          <include name="**/MemManReferenceTest.java"/>
           <exclude name="**/Abstract*"/>
           <exclude name="reports/"/>
         </fileset>
@@ -122,13 +107,12 @@
     <pitest pitClasspath="pitest.path"
       threads="2"
       classPath="mutation.classpath"
-      targetTests="*Test,Test*"
-      targetClasses="*"
-      includeLaunchClasspath="false"
-      excludedClasses="*Test,Test*"
+      targetTests="com.example.MemManReferenceTest*"
+      targetClasses="com.example.*"
+      excludedClasses="com.example.*Test*"
       reportDir="${pit_reports}"
       timestampedReports="false"
-      sourceDir="src"
+      sourceDir="src/"
       outputFormats="HTML,CSV"
       mutators="REMOVE_CONDITIONALS,VOID_METHOD_CALLS,NON_VOID_METHOD_CALLS,CONSTRUCTOR_CALLS,TRUE_RETURNS,FALSE_RETURNS,PRIMITIVE_RETURNS,EMPTY_RETURNS"
       />
