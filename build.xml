@@ -9,6 +9,8 @@
 
   <echo message="resource_dir = ${resource_dir}" />
   <echo message="basedir = ${basedir}" />
+  <echo message="mutating: ${target_classes}" />
+  <echo message="using tests: ${target_tests}" />
 
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
@@ -107,9 +109,9 @@
     <pitest pitClasspath="pitest.path"
       threads="2"
       classPath="mutation.classpath"
-      targetTests="com.example.MemManReferenceTest*"
-      targetClasses="com.example.*"
-      excludedClasses="com.example.*Test*"
+      targetTests="${target_tests}"
+      targetClasses="${target_classes}"
+      excludedClasses="${target_tests}"
       reportDir="${pit_reports}"
       timestampedReports="false"
       sourceDir="src/"

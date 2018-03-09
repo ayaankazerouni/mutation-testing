@@ -2,7 +2,6 @@ projects/*
 lib/
 *.ipynb
 __pycache__/
-<<<<<<< HEAD
 
 *.Rproj*
 .Rhistory
@@ -11,3 +10,4 @@ data/*
 .Rproj.user
 
 *-notebook.html
+tasks.json
