@@ -1,5 +1,5 @@
 taskFile="tasks.json"
-project_dir="/home/ayaan/Developer/student-projects/f16-p1-submissions/"
+project_dir="/home/ayaan/Developer/student-projects/f16-p4-submissions/"
 skip_tasks=false
 skip_run=false
 
@@ -18,6 +18,7 @@ while getopts ":t:r" opt; do
 done
 
 if [ "$skip_tasks" = false ] ; then 
+  rm -f ${taskFile}
   find  ${project_dir} -maxdepth 1 -type d | while read line; do
     if [[ $line != $project_dir ]]; then
       echo "{ \"projectPath\": \"$line\", \"task\": \"pit\" }" >> $taskFile
