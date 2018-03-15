@@ -16,7 +16,7 @@ require(lmerTest)
 
 mutationdata = read.csv('data/f16.csv')
 mutationdata = mutationdata %>% rename(mutationCoverage = coverage, 
-                                       branchCoverage = elementsCovered, 
+                                       conditionCoverage = elementsCovered, 
                                        projectScore = score.reftest) %>%
   rowwise() %>%
   mutate(solved = ifelse(projectScore >= 0.95, TRUE, FALSE))
@@ -26,8 +26,8 @@ unsolved = mutationdata %>% filter(!solved)
 ```
 
 ```{r echo=FALSE}
-boxplot(mutationdata$mutationCoverage, mutationdata$branchCoverage, ylab="Code coverage", 
-        names = c("Mutation coverage", "Branch coverage"), main="Code coverage distributions")
+boxplot(mutationdata$mutationCoverage, mutationdata$conditionCoverage, ylab="Code coverage", 
+        names = c("Mutation coverage", "Condition coverage"), main="Code coverage distributions")
 ```
 
 ## Relationship with project outcomes
@@ -66,17 +66,16 @@ $H_O =$ Branch coverage for solved projects is less than or equal to that of uns
 $H_A =$ Branch coverage is higher for solved projects than unsolved ones.
 
 ```{r echo=FALSE}
-wilcox.test(solved$branchCoverage, unsolved$branchCoverage, alternative = 'g')
+wilcox.test(solved$conditionCoverage, unsolved$conditionCoverage, alternative = 'g')
 ```
 
 **Linear mixed effects model**
 
 ```{r echo=FALSE}
-branch.fit.correctness = lmer(projectScore ~ branchCoverage + (1 | userId), data = mutationdata)
+branch.fit.correctness = lmer(projectScore ~ conditionCoverage + (1 | userId), data = mutationdata)
 anova(branch.fit.correctness)
 ```
 
 Model BIC = `r BIC(branch.fit.correctness)`
 
 *Seems to be a much better model, but almost suspiciously so.* Difference in models is also present in simple linear models.
-
