@@ -6,7 +6,6 @@ __pycache__/
 *.Rproj*
 .Rhistory
 .RData
-data/*
 .Rproj.user
 
 *-notebook.html
