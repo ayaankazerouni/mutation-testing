@@ -19,6 +19,7 @@
 
 const path = require('path');
 const fs = require('fs-extra');
+const ndjson = require('ndjson');
 const promisify = require('util-promisify');
 const exec = promisify(require('child_process').exec);
 const traverseList = promisify(require('fs-tree-traverse').list);
@@ -29,14 +30,9 @@ if (!argFile) {
   process.exit(1);
 }
 
-const opts = JSON.parse(fs.readFileSync(argFile, 'utf-8'));
-const projectPath = opts.projectPath;
-const task = opts.task;
-const suppressOut = opts.suppressOut;
-const suppressErr = opts.suppressErr;
-
-function testSingleProject(projectPath) {
+function testSingleProject(options) {
   // copy the project to /tmp/ to avoid modifying the original
+  const { projectPath, task = 'pit' } = options;
   const clonePath = path.join('/tmp/mutation-testing', path.basename(projectPath)); 
   const src = path.join(clonePath, 'src');
   const pkg = path.join(src, 'com', 'example');
@@ -89,16 +85,17 @@ function testSingleProject(projectPath) {
     return exec(`ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${task}`); 
   })
   .then((result) => { // this is an object
-    if (!suppressOut) console.log(`stdout: ${result.stdout.toString()}`);
-    if (!suppressErr) console.log(`stderr: ${result.stderr || 'None'}`);
+    const output = { success: true, project: projectPath };
+    console.log(JSON.stringify(output));
   })
   .catch((err) => {
-    console.error(err); 
+    const output = { success: false, project: projectPath, message: err.message };
+    console.log(JSON.stringify(output));
   });
 }
 
-try {
-  testSingleProject(projectPath);
-} catch(error) {
-  console.error(error);
-}
+fs.createReadStream(argFile)
+  .pipe(ndjson.parse())
+  .on('data', (obj) => {
+    testSingleProject(obj);
+  });

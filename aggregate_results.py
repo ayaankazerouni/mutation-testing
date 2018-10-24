@@ -43,7 +43,9 @@ def aggregate_mutation_results(infile):
         mutationshtml = path.join(projpath, 'pitReports', 'com.example')
         
         if path.isfile(mutationscsv) and path.isdir(mutationshtml):
-            resultpaths[proj] = mutationscsv 
+            resultpaths[proj] = mutationscsv
+        else:
+            print('No results for {}'.format(proj))
 
     mutationcoverage = pd.Series(resultpaths).apply(__get_mutation_coverage)
     return mutationcoverage
