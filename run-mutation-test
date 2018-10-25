@@ -12,7 +12,7 @@
  * 
  * Dependencies:
  *  - npm install fs-extra, util-promisify
- *  - or simple npm install if you have package.json or package-lock.json
+ *  - or simply npm install if you have package.json or package-lock.json
  */
 
 'use strict';

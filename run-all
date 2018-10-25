@@ -1,3 +1,5 @@
+#! /usr/bin/env bash
+
 # positional params put here later
 PARAMS=""
 
@@ -66,6 +68,9 @@ fi
 
 if [ "$SKIP_RUN" = false ] ; then
   echo "Starting mutation testing. This might take a while."
-  parallel --progress --arg-file tasks.json --pipepart --cat ./run-mutation-test.js {} > /tmp/mutation-results.json
-  echo "Run summary in /tmp/mutation-results.json. PITest reports in /tmp/mutation-testing/. Use ./aggregrate_results.py to translate PIT reports to coverage data."
+  parallel --progress --arg-file ${TASKFILE} --pipepart --cat ./run-mutation-test {} > /tmp/mutation-results.json
+  echo "FINISHED"
+  echo -e "\tRun summary in /tmp/mutation-results.json"
+  echo -e "\tPITest reports in /tmp/mutation-testing/."
+  echo -e "\tUse ./aggregrate_results.py to translate PIT reports to coverage data."
 fi 

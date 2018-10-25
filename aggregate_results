@@ -1,5 +1,9 @@
 #! /usr/bin/env python3
 
+"""Utility to aggregate PITest mutation data for several projects
+into a CSV file for analysis.
+"""
+
 import pandas as pd
 from os import listdir, path
 import argparse
@@ -25,11 +29,10 @@ def __get_mutation_coverage(resultspath):
 
 def aggregate_mutation_results(infile):
     """
-    Aggregate output from mutation testing by reading
-    results from PIT tests.
-
-    Keyword arguments:
-    infile -- Path to the directory containing tested projects
+    Aggregate output from mutation testing by reading PITest reports.
+    
+    Args:
+        infile (str): Path to the directory containing tested projects
     """
     if (not path.isabs(infile)):
         infile = path.abspath(infile)

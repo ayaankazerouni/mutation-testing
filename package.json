@@ -1,15 +1,15 @@
 {
   "name": "mutation-testing",
+  "author": "",
   "version": "1.0.0",
   "description": "",
-  "main": "my-echo.js",
+  "main": "run-mutation-test.js",
   "directories": {
     "lib": "lib"
   },
   "dependencies": {
     "fs-extra": "^5.0.0",
     "fs-tree-traverse": "^0.1.0",
-    "node-getopt": "^0.2.3",
     "util-promisify": "^2.1.0"
   },
   "devDependencies": {},
@@ -20,7 +20,6 @@
     "type": "git",
     "url": "git+ssh://git@bitbucket.org/ayaankazerouni/mutation-testing.git"
   },
-  "author": "",
   "license": "ISC",
   "homepage": "https://bitbucket.org/ayaankazerouni/mutation-testing#readme"
 }
