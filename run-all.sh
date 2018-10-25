@@ -6,6 +6,7 @@ PROJECTDIR=~/Developer/student-projects/testsubmissions
 TASKFILE=tasks.json
 SKIP_TASKS=false
 SKIP_RUN=false
+DEPTH=1
 
 while (( "$#" )); do
   case "$1" in
@@ -17,12 +18,18 @@ while (( "$#" )); do
       SKIP_RUN=true
       shift
       ;;
+    -d|--find-depth)
+      DEPTH=$2
+      shift 2
+      ;;
     -h|--help)
       echo "Positional arguments (should be in this relative order):"
       echo -e "\tPROJECTDIR: The directory containing submissions to be mutated."
       echo -e "\t\tDefaults to ${PROJECTDIR}"
       echo -e "\tTASKFILE: The file to which tasks for GNU Parallel should be written."
       echo -e "\t\tDefaults to ${TASKFILE}"
+      echo "Named arguments:"
+      echo -e "\t-d --find-depth: Exact at which to find directories to mutate, within PROJECTDIR"
       echo "Options:"
       echo -e "\t-t: Skip generating a task file? Use this if you already have tasks written to a file."
       echo -e "\t-r: Skip mutation testing? Convenient to only write tasks."
@@ -51,10 +58,8 @@ fi
 
 if [ "$SKIP_TASKS" = false ] ; then 
   rm -f ${TASKFILE}
-  find  ${PROJECTDIR} -maxdepth 1 -type d | while read line; do
-    if [[ $line != $PROJECTDIR ]]; then
-      echo "{ \"projectPath\": \"$line\", \"task\": \"pit\" }" >> $TASKFILE
-    fi
+  find  ${PROJECTDIR} -maxdepth ${DEPTH} -mindepth ${DEPTH} -type d | while read line; do
+    echo "{ \"projectPath\": \"$line\", \"task\": \"pit\" }" >> $TASKFILE
   done
   echo "Wrote tasks from ${PROJECTDIR} to ${TASKFILE}."
 fi
