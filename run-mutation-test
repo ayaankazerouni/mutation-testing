@@ -84,8 +84,8 @@ function testSingleProject(options) {
     // run ANT
     const antPath = path.join(__dirname, 'build.xml'); // path to shared build file
     const libPath = path.join(__dirname, 'lib'); // path to shared libraries 
-
-    return exec(`ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${task}`); 
+    const cmd = `ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${task} > /dev/null 2>&1`;
+    return exec(cmd); 
   })
   .then((result) => { // this is an object
     const diff = process.hrtime(hrstart);

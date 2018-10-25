@@ -10,6 +10,19 @@ SKIP_TASKS=false
 SKIP_RUN=false
 DEPTH=1
 
+showhelp () {
+  echo "Positional arguments (should be in this relative order):"
+  echo -e "\tPROJECTDIR: The directory containing submissions to be mutated."
+  echo -e "\t\tDefaults to ${PROJECTDIR}"
+  echo -e "\tTASKFILE: The file to which tasks for GNU Parallel should be written."
+  echo -e "\t\tDefaults to ${TASKFILE}"
+  echo "Named arguments:"
+  echo -e "\t-d --find-depth: Exact depth at which to find directories to mutate, within PROJECTDIR"
+  echo "Options:"
+  echo -e "\t-t: Skip generating a task file? Use this if you already have tasks written to a file."
+  echo -e "\t-r: Skip mutation testing? Convenient to only write tasks."
+}
+
 while (( "$#" )); do
   case "$1" in
     -t)
@@ -25,19 +38,10 @@ while (( "$#" )); do
       shift 2
       ;;
     -h|--help)
-      echo "Positional arguments (should be in this relative order):"
-      echo -e "\tPROJECTDIR: The directory containing submissions to be mutated."
-      echo -e "\t\tDefaults to ${PROJECTDIR}"
-      echo -e "\tTASKFILE: The file to which tasks for GNU Parallel should be written."
-      echo -e "\t\tDefaults to ${TASKFILE}"
-      echo "Named arguments:"
-      echo -e "\t-d --find-depth: Exact at which to find directories to mutate, within PROJECTDIR"
-      echo "Options:"
-      echo -e "\t-t: Skip generating a task file? Use this if you already have tasks written to a file."
-      echo -e "\t-r: Skip mutation testing? Convenient to only write tasks."
+      showhelp
       exit 0
       ;;
-    --) # end arugment parsing
+    --) # end argument parsing
       shift
       break
       ;;

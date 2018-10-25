@@ -30,7 +30,7 @@ def __get_mutation_coverage(resultspath):
 def aggregate_mutation_results(infile):
     """
     Aggregate output from mutation testing by reading PITest reports.
-    
+
     Args:
         infile (str): Path to the directory containing tested projects
     """
