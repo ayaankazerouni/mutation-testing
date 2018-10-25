@@ -1,38 +1,66 @@
-taskFile="tasks.json"
-project_dir="/home/ayaan/Developer/student-projects/fall-2016-repos/"
-skip_tasks=false
-skip_run=false
+# positional params put here later
+PARAMS=""
 
-while getopts ":tr" opt; do
-  case $opt in
-    t)
-      skip_tasks=true
+# default values
+PROJECTDIR=~/Developer/student-projects/testsubmissions
+TASKFILE=tasks.json
+SKIP_TASKS=false
+SKIP_RUN=false
+
+while (( "$#" )); do
+  case "$1" in
+    -t)
+      SKIP_TASKS=true
+      shift
       ;;
-    r)
-      skip_run=true
+    -r)
+      SKIP_RUN=true
+      shift
       ;;
-    \?)
-      echo "invalid option -$OPTARG" >&2
+    -h|--help)
+      echo "Positional arguments (should be in this relative order):"
+      echo -e "\tPROJECTDIR: The directory containing submissions to be mutated."
+      echo -e "\t\tDefaults to ${PROJECTDIR}"
+      echo -e "\tTASKFILE: The file to which tasks for GNU Parallel should be written."
+      echo -e "\t\tDefaults to ${TASKFILE}"
+      echo "Options:"
+      echo -e "\t-t: Skip generating a task file? Use this if you already have tasks written to a file."
+      echo -e "\t-r: Skip mutation testing? Convenient to only write tasks."
+      exit 0
+      ;;
+    --) # end arugment parsing
+      shift
+      break
+      ;;
+    *) # preserve positionals
+      PARAMS="$PARAMS $1"
+      shift
       ;;
   esac
 done
 
-if [ "$skip_tasks" = false ] ; then 
-  rm -f ${taskFile}
-  find  ${project_dir} -maxdepth 1 -type d | while read line; do
-    if [[ $line != $project_dir ]]; then
-      echo "{ \"projectPath\": \"$line\", \"task\": \"pit\" }" >> $taskFile
-    fi
-  done
-  echo "Wrote tasks from ${project_dir} to ${taskFile}."
+eval set -- "$PARAMS" 
+
+if [[ -n "$1" ]]; then
+  PROJECTDIR=$1
 fi
 
-if [ "$skip_run" = false ] ; then
-  # ./lib/distributed-map.pl \
-  #   --cluster clusters.json \
-  #   --workScript /home/ayaan/Developer/mutation-testing/run-mutation-test.js \
-  #   --taskFile $taskFile \
-  #   --env 'PATH=/home/ayaan/.nvm/versions/node/v8.9.4/bin/node:$PATH'
-  echo "Starting parallel mutation testing. This might take a while."
-  parallel --arg-file tasks.json --pipepart --cat ./run-mutation-test.js {} > /tmp/mutation-results.json
+if [[ -n "$2" ]]; then
+  TASKFILE=$2
+fi 
+
+if [ "$SKIP_TASKS" = false ] ; then 
+  rm -f ${TASKFILE}
+  find  ${PROJECTDIR} -maxdepth 1 -type d | while read line; do
+    if [[ $line != $PROJECTDIR ]]; then
+      echo "{ \"projectPath\": \"$line\", \"task\": \"pit\" }" >> $TASKFILE
+    fi
+  done
+  echo "Wrote tasks from ${PROJECTDIR} to ${TASKFILE}."
+fi
+
+if [ "$SKIP_RUN" = false ] ; then
+  echo "Starting mutation testing. This might take a while."
+  parallel --progress --arg-file tasks.json --pipepart --cat ./run-mutation-test.js {} > /tmp/mutation-results.json
+  echo "Run summary in /tmp/mutation-results.json. PITest reports in /tmp/mutation-testing/. Use ./aggregrate_results.py to translate PIT reports to coverage data."
 fi 

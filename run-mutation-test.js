@@ -30,14 +30,17 @@ if (!argFile) {
   process.exit(1);
 }
 
+const NS_PER_SEC = 1e9;
+
 function testSingleProject(options) {
   // copy the project to /tmp/ to avoid modifying the original
   const { projectPath, task = 'pit' } = options;
   const clonePath = path.join('/tmp/mutation-testing', path.basename(projectPath)); 
   const src = path.join(clonePath, 'src');
   const pkg = path.join(src, 'com', 'example');
+  const hrstart = process.hrtime();
 
-  fs.copy(projectPath, clonePath)
+  return fs.copy(projectPath, clonePath)
   // Create artificial package structure for items in the default package
   // so PIT doesn't try to mutate itself
   .then(() => {
@@ -85,11 +88,16 @@ function testSingleProject(options) {
     return exec(`ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${task}`); 
   })
   .then((result) => { // this is an object
-    const output = { success: true, project: projectPath };
+    const diff = process.hrtime(hrstart);
+    const runningTime = diff[0] + (diff[1] / NS_PER_SEC);
+    const output = { success: true, projectPath, runningTime };
     console.log(JSON.stringify(output));
   })
   .catch((err) => {
-    const output = { success: false, project: projectPath, message: err.message };
+    const diff = process.hrtime(hrstart);
+    const runningTime = diff[0] + (diff[1] / NS_PER_SEC);
+    const { message } = err;
+    const output = { success: false, projectPath, message, runningTime };
     console.log(JSON.stringify(output));
   });
 }

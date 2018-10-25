@@ -6,6 +6,9 @@ if [[ -z $lookindir ]]; then
   lookindir="."
 fi
 
+# web-cat submissions are downloaded in a certain format
+# this unzips the jar and places the project in a top level
+# directory with the same name as the jar file
 find ${lookindir} -name "*.jar" |
   while read filename; do
     parentdir="$(dirname $filename)"
