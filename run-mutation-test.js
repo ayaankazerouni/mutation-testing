@@ -18,8 +18,8 @@
 'use strict';
 
 const path = require('path');
+const readline = require('readline');
 const fs = require('fs-extra');
-const ndjson = require('ndjson');
 const promisify = require('util-promisify');
 const exec = promisify(require('child_process').exec);
 const traverseList = promisify(require('fs-tree-traverse').list);
@@ -94,8 +94,12 @@ function testSingleProject(options) {
   });
 }
 
-fs.createReadStream(argFile)
-  .pipe(ndjson.parse())
-  .on('data', (obj) => {
-    testSingleProject(obj);
-  });
+const rl = readline.createInterface({
+  input: fs.createReadStream(argFile),
+  crlfDelay: Infinity
+});
+
+rl.on('line', (line) => {
+  const opts = JSON.parse(line);
+  testSingleProject(opts);
+});
