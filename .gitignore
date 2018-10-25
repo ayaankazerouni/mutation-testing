@@ -11,3 +11,4 @@ __pycache__/
 *-notebook.html
 tasks.json
 node_modules/
+data/
