@@ -10,9 +10,14 @@
  *    PIT doesn't try to mutate itself
  *  - Run PIT from the ANT build file (assumed to be in the current directory)
  * 
- * Dependencies:
+ * NPM dependencies:
  *  - npm install fs-extra, util-promisify
  *  - or simply npm install if you have package.json or package-lock.json
+ *
+ * Mutation testing dependencies:
+ *  - ANT (https://ant.apache.org)
+ *  - PIT (http://pitest.org)
+ *  - see lib/ for required jars to get PIT running
  */
 
 'use strict';
@@ -28,6 +33,11 @@ const argFile = process.argv[2];
 if (!argFile) {
   console.error('Error, no args :-(');
   process.exit(1);
+}
+
+let log = true;
+if (!process.argv[3] || process.argv[3] !== '-l') {
+  log = false;
 }
 
 const NS_PER_SEC = 1e9;
@@ -48,6 +58,9 @@ function testSingleProject(options) {
     return fs.mkdirp(pkg);
   })
   .then(() => {
+    // TODO: Check if src directory actually exists. If it doesn't, look one level deeper.
+    // That will help fix about 90% of the errors.
+
     // Move Java files into src/com/example
     return exec(`mv ${path.join(src, '*.java')} ${pkg}`);
   })
@@ -84,7 +97,10 @@ function testSingleProject(options) {
     // run ANT
     const antPath = path.join(__dirname, 'build.xml'); // path to shared build file
     const libPath = path.join(__dirname, 'lib'); // path to shared libraries 
-    const cmd = `ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${task} > /dev/null 2>&1`;
+    const cmd = `ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${task}`;
+    if (!log) {
+      cmd = cmd + ' > /dev/null 2>&1';
+    }
     return exec(cmd); 
   })
   .then((result) => { // this is an object
@@ -92,6 +108,9 @@ function testSingleProject(options) {
     const runningTime = diff[0] + (diff[1] / NS_PER_SEC);
     const output = { success: true, projectPath, runningTime };
     console.log(JSON.stringify(output));
+    if (log) {
+      console.log(result.stdout.replace('\\n', '\n'));
+    }
   })
   .catch((err) => {
     const diff = process.hrtime(hrstart);
@@ -99,6 +118,9 @@ function testSingleProject(options) {
     const { message } = err;
     const output = { success: false, projectPath, message, runningTime };
     console.log(JSON.stringify(output));
+    if (log) {
+      console.error(err.stdout.replace('\\n', '\n'));
+    }
   });
 }
 
