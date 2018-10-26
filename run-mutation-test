@@ -2,7 +2,7 @@
 
 /*
  * Author: Ayaan Kazerouni <ayaan@vt.edu>
- * Description: Run mutation analysis on a single project.
+ * Description: Run mutation analysis on projects from a taskFile. 
  *
  * Overview:
  *  - Copy project to /tmp/
@@ -18,6 +18,11 @@
  *  - ANT (https://ant.apache.org)
  *  - PIT (http://pitest.org)
  *  - see lib/ for required jars to get PIT running
+ *
+ * Usage:
+ *  - Part of a parallel job, using GNU Parallel (see ./run-all)
+ *  - Run as a CLI tool on one or more projects.
+ *    Usage: ./run-mutation-test -h
  */
 
 'use strict';
@@ -29,107 +34,140 @@ const promisify = require('util-promisify');
 const exec = promisify(require('child_process').exec);
 const traverseList = promisify(require('fs-tree-traverse').list);
 
+if (process.argv.includes('-h') || process.argv.includes('--help')) {
+  console.log('Run mutation analysis on projects from a taskFile.');
+  console.log('Usage: ./run-mutation-test tasks.json [-l]');
+  console.log('taskFile\t NDJSON file containing tasks with the keys:');
+  console.log('\t\t{projectPath (required), antTask (default "pit")');
+  console.log('-l\t Print stdout and stderr? Don\'t use this with GNU parallel'); 
+  process.exit(0);
+}
+
 const argFile = process.argv[2];
 if (!argFile) {
   console.error('Error, no args :-(');
   process.exit(1);
 }
 
-let log = true;
-if (!process.argv[3] || process.argv[3] !== '-l') {
-  log = false;
+let log = false;
+if (process.argv[3] || process.argv[3] === '-l') {
+  log = true;
 }
 
 const NS_PER_SEC = 1e9;
 
-function testSingleProject(options) {
-  // copy the project to /tmp/ to avoid modifying the original
-  const { projectPath, task = 'pit' } = options;
-  const clonePath = path.join('/tmp/mutation-testing', path.basename(projectPath)); 
-  const src = path.join(clonePath, 'src');
-  const pkg = path.join(src, 'com', 'example');
-  const hrstart = process.hrtime();
+function run() {
+  // Entry point
+  const rl = readline.createInterface({
+    input: fs.createReadStream(argFile),
+    crlfDelay: Infinity
+  });
 
-  return fs.copy(projectPath, clonePath)
-  // Create artificial package structure for items in the default package
-  // so PIT doesn't try to mutate itself
-  .then(() => {
-    // Create src/com/example
-    return fs.mkdirp(pkg);
-  })
-  .then(() => {
-    // TODO: Check if src directory actually exists. If it doesn't, look one level deeper.
-    // That will help fix about 90% of the errors.
+  rl.on('line', async (line) => {
+    const opts = JSON.parse(line);
+    const hrstart = process.hrtime();
+    let success = true, message = '', logOutput;
+    const result = await testSingleProject(opts)
+      .catch((err) => {
+        success = false;
+        message = err.message;
+        if (log) {
+          logOutput = err.stdout.replace('\\n', '\n');
+        }
+      });
 
-    // Move Java files into src/com/example
-    return exec(`mv ${path.join(src, '*.java')} ${pkg}`);
-  })
-  .then(() => {
-    // Add the package declaration to the top of Java files
-    return exec(`sed -i '1ipackage com.example;' ${path.join(pkg, '*.java')}`);
-  })
-  .then(() => {
-    return traverseList(src, { relative: true } );
-  })
-  .then((dirTree) => {
-    // Compute packages to point PIT at
-    var dirs = dirTree.map(p => path.dirname(p)); 
-    var targetClasses = [];
-    var targetTests = [];
-    
-    dirs = [...new Set(dirs)]; // unique 
-    dirs.forEach(d => {
-      d = d.replace("/", ".");
-      var packageName;
-      if (d.endsWith(".")) {
-        packageName = `${d}*`; 
-      } else {
-        packageName = `${d}.*`; 
+    const diff = process.hrtime(hrstart); 
+    const runningTime = diff[0] + (diff[1] / NS_PER_SEC);
+    const output = {
+      success,
+      projectPath: opts.projectPath,
+      message,
+      runningTime
+    };
+    console.log(JSON.stringify(output));
+
+    if (log) {
+      if (result) {
+        logOutput = result.stdout.replace('\\n', '\n');
       }
 
-      targetClasses.push(packageName);
-      targetTests.push(`${packageName}Test*`);
-    })
-
-    targetClasses = targetClasses.join(",");
-    targetTests = targetTests.join(",");
-
-    // run ANT
-    const antPath = path.join(__dirname, 'build.xml'); // path to shared build file
-    const libPath = path.join(__dirname, 'lib'); // path to shared libraries 
-    const cmd = `ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${task}`;
-    if (!log) {
-      cmd = cmd + ' > /dev/null 2>&1';
-    }
-    return exec(cmd); 
-  })
-  .then((result) => { // this is an object
-    const diff = process.hrtime(hrstart);
-    const runningTime = diff[0] + (diff[1] / NS_PER_SEC);
-    const output = { success: true, projectPath, runningTime };
-    console.log(JSON.stringify(output));
-    if (log) {
-      console.log(result.stdout.replace('\\n', '\n'));
-    }
-  })
-  .catch((err) => {
-    const diff = process.hrtime(hrstart);
-    const runningTime = diff[0] + (diff[1] / NS_PER_SEC);
-    const { message } = err;
-    const output = { success: false, projectPath, message, runningTime };
-    console.log(JSON.stringify(output));
-    if (log) {
-      console.error(err.stdout.replace('\\n', '\n'));
+      console.log(logOutput);
     }
   });
 }
 
-const rl = readline.createInterface({
-  input: fs.createReadStream(argFile),
-  crlfDelay: Infinity
-});
+/**
+ * Run mutation testing on a single project. has file system side effects.
+ * Copies the project to /tmp/ and runs mutation testing using PIT. PIT
+ * results are in /tmp/{projectPath}/pitReports.
+ *
+ * @param options An object containing the keys projectPath (required) and
+ *                antTask (optional, defaults to "pit")
+ *
+ * @return a Promise whose result will contain the results of the ANT build ({ stdout, stderr })
+ */
+async function testSingleProject(options) {
+  // copy the project to /tmp/ to avoid modifying the original
+  const { projectPath, antTask = 'pit' } = options;
+  const clonePath = path.join('/tmp/mutation-testing', path.basename(projectPath)); 
+  const src = path.join(clonePath, 'src');
+  const pkg = path.join(src, 'com', 'example');
 
-rl.on('line', (line) => {
-  const opts = JSON.parse(line);
-  testSingleProject(opts);
-});
+  await fs.copy(projectPath, clonePath)
+
+  // Create artificial package structure for items in the default package
+  // so PIT doesn't try to mutate itself (src/com/example)
+  await fs.mkdirp(pkg);
+
+  // Move Java files directly under src into src/com/example
+  await exec(`mv ${path.join(src, '*.java')} ${pkg}`);
+
+  // Add the package declaration to the top of Java files
+  await exec(`sed -i '1ipackage com.example;' ${path.join(pkg, '*.java')}`);
+ 
+  // Prepare to run PIT using ANT
+  const antPath = path.join(__dirname, 'build.xml'); // path to shared build file
+  const libPath = path.join(__dirname, 'lib'); // path to shared libraries 
+  const { targetClasses, targetTests } = await getPitTargets(src); 
+  let cmd = `ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${antTask}`;
+  if (!log) {
+    cmd = cmd + ' > /dev/null 2>&1';
+  }
+  
+  // execute ANT
+  return exec(cmd);
+}
+
+/**
+ * Compute package to point PIT at.
+ *
+ * @param src Directory containing Java source files
+ * @return { targetClasses, targetTests }
+ */
+async function getPitTargets(src) {
+  const dirTree = await traverseList(src, { relative: true } );
+  let targetClasses = [];
+  let targetTests = [];
+  let dirs = dirTree.map(p => path.dirname(p)); 
+  
+  dirs = [...new Set(dirs)]; // unique 
+  dirs.forEach(d => {
+    d = d.replace("/", ".");
+    let packageName;
+    if (d.endsWith(".")) {
+      packageName = `${d}*`; 
+    } else {
+      packageName = `${d}.*`; 
+    }
+
+    targetClasses.push(packageName);
+    targetTests.push(`${packageName}Test*`);
+  });
+
+  targetClasses = targetClasses.join(",");
+  targetTests = targetTests.join(",");
+
+  return { targetClasses, targetTests };
+}
+
+run();

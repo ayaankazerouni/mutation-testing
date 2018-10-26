@@ -65,7 +65,7 @@ fi
 if [ "$SKIP_TASKS" = false ] ; then 
   rm -f ${TASKFILE}
   find  ${PROJECTDIR} -maxdepth ${DEPTH} -mindepth ${DEPTH} -type d | while read line; do
-    echo "{ \"projectPath\": \"$line\", \"task\": \"pit\" }" >> $TASKFILE
+    echo "{ \"projectPath\": \"$line\", \"antTask\": \"pit\" }" >> $TASKFILE
   done
   echo "Wrote tasks from ${PROJECTDIR} to ${TASKFILE}."
 fi
