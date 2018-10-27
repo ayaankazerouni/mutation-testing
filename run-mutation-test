@@ -1,174 +1,176 @@
-#! /usr/bin/env node
+#! /usr/bin/env python3
 
-/*
- * Author: Ayaan Kazerouni <ayaan@vt.edu>
- * Description: Run mutation analysis on projects from a taskFile. 
- *
- * Overview:
- *  - Copy project to /tmp/
- *  - Create artificial package structure for the project so that
- *    PIT doesn't try to mutate itself
- *  - Run PIT from the ANT build file (assumed to be in the current directory)
- * 
- * NPM dependencies:
- *  - npm install fs-extra, util-promisify
- *  - or simply npm install if you have package.json or package-lock.json
- *
- * Mutation testing dependencies:
- *  - ANT (https://ant.apache.org)
- *  - PIT (http://pitest.org)
- *  - see lib/ for required jars to get PIT running
- *
- * Usage:
- *  - Part of a parallel job, using GNU Parallel (see ./run-all)
- *  - Run as a CLI tool on one or more projects.
- *    Usage: ./run-mutation-test -h
- */
+"""
+Author: Ayaan Kazerouni <ayaan@vt.edu>
+Description: Run mutation analysis on projects from a taskFile. 
 
-'use strict';
+Overview:
+ - Copy project to /tmp/
+ - Create artificial package structure for the project so that
+   PIT doesn't try to mutate itself
+ - Run PIT from the ANT build file (assumed to be in the current directory)
 
-const path = require('path');
-const readline = require('readline');
-const fs = require('fs-extra');
-const promisify = require('util-promisify');
-const exec = promisify(require('child_process').exec);
-const execSync = require('child_process').execSync;
-const traverseList = promisify(require('fs-tree-traverse').list);
+Mutation testing dependencies:
+ - ANT (https://ant.apache.org)
+ - PIT (http://pitest.org)
+ - see lib/ for required jars to get PIT running
+ - (on macOS) brew install gsed
 
-if (process.argv.includes('-h') || process.argv.includes('--help')) {
-  console.log('Run mutation analysis on projects from a taskFile.');
-  console.log('Usage: ./run-mutation-test tasks.json [-l]');
-  console.log('taskFile\t NDJSON file containing tasks with the keys:');
-  console.log('\t\t{projectPath (required), antTask (default "pit")');
-  console.log('-l\t Print stdout and stderr? Don\'t use this with GNU parallel'); 
-  process.exit(0);
-}
+Usage:
+ - Part of a parallel job, using GNU Parallel (see ./run-all)
+ - Run as a CLI tool on one or more projects.
+   Usage: ./run-mutation-test -h
+"""
 
-const argFile = process.argv[2];
-if (!argFile) {
-  console.error('Error, no args :-(');
-  process.exit(1);
-}
+import os
+import sys
+import json
+import time
+import subprocess
+from shutil import rmtree, copytree
 
-let log = false;
-if (process.argv[3] || process.argv[3] === '-l') {
-  log = true;
-}
+def main(args):
+    """Entry point. Respond to CLI args and trigger execution."""
+    if any(x in args for x in [ '-h', '--help' ]):
+        usage()
+   
+    log = False
+    if any(x in args for x in [ '-l', '--log' ]):
+        log = True
 
-const NS_PER_SEC = 1e9;
+    taskfile = args[0]
+    run(taskfile, log=log)
 
-function run() {
-  // Entry point
-  const rl = readline.createInterface({
-    input: fs.createReadStream(argFile),
-    crlfDelay: Infinity
-  });
+def usage():
+    """Print usage info."""
+    usage = '''
+    Run mutation analysis on projects from a taskFile.
+    Usage: ./run-mutation-test tasks.json [-l] [-h]
 
-  rl.on('line', async (line) => {
-    const opts = JSON.parse(line);
-    const hrstart = process.hrtime();
-    let success = true, message = '', logOutput;
-    const result = await testSingleProject(opts)
-      .catch((err) => {
-        success = false;
-        message = err.message;
-        if (log) {
-          logOutput = err.stdout.replace('\\n', '\n');
-        }
-      });
+    taskFile\t NDJSON file containing tasks with the keys:
+    \t\t{ projectPath (required), antTask (default "pit") }
+    -l|--log\t Print stdout and stderr? Don't use this with GNU Parallel
+    -h|--help\t Print this help (ignoring any other params)
+    '''
+    print(usage)
+    sys.exit(1)
 
-    const diff = process.hrtime(hrstart); 
-    const runningTime = diff[0] + (diff[1] / NS_PER_SEC);
-    const output = {
-      success,
-      projectPath: opts.projectPath,
-      message,
-      runningTime
-    };
-    console.log(JSON.stringify(output));
+def run(taskfile, log=False):
+    """Trigger mutation testing and respond to output.
 
-    if (log) {
-      if (result) {
-        logOutput = result.replace('\\n', '\n');
-      }
+    Output is printed to the console in the form of a stringified dict.
+    Arguments:
+        log (bool): Print full stdout/stderr?
+    """
+    with open(taskfile) as f:
+        for line in f:
+            opts = json.loads(line)
+            start = time.time()
+            try:
+                result = testsingleproject(opts, log)
+                diff = time.time() - start
+                output = {
+                        'success': True,
+                        'projectPath': opts['projectPath'],
+                        'runningTime': diff
+                    }
+                print(json.dumps(output))
+                if log:
+                    print(result.stdout)
+            except subprocess.CalledProcessError as e:
+                diff = time.time() - start
+                output = {
+                        'success': False,
+                        'projectPath': opts.projectPath,
+                        'message': repr(e),
+                        'runningTime': diff
+                    }
+                print(json.dumps(output))
+                if log:
+                    print(e.stderr)
+                
 
-      console.log(logOutput);
-    }
-  });
-}
+def testsingleproject(opts, log):
+    """Run mutation testing on a single project.
 
-/**
- * Run mutation testing on a single project. has file system side effects.
- * Copies the project to /tmp/ and runs mutation testing using PIT. PIT
- * results are in /tmp/{projectPath}/pitReports.
- *
- * @param options An object containing the keys projectPath (required) and
- *                antTask (optional, defaults to "pit")
- *
- * @return a Promise whose result will contain the results of the ANT build ({ stdout, stderr })
- */
-async function testSingleProject(options) {
-  // copy the project to /tmp/ to avoid modifying the original
-  const { projectPath, antTask = 'pit' } = options;
-  const clonePath = path.join('/tmp/mutation-testing', path.basename(projectPath)); 
-  const src = path.join(clonePath, 'src');
-  const pkg = path.join(src, 'com', 'example');
+    This function has file system side effects. Copies the project to /tmp/ and
+    runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
-  await fs.copy(projectPath, clonePath);
+    Arguments:
+        options (dict): Containing the keys { projectPath (required), antTask (default "pit")
 
-  // Create artificial package structure for items in the default package
-  // so PIT doesn't try to mutate itself (src/com/example)
-  await fs.mkdirp(pkg);
+    Returns:
+        *subprocess.CompletedProcess*: The result of executing the ANT task
 
-  // Move Java files directly under src into src/com/example
-  await exec(`mv ${path.join(src, '*.java')} ${pkg}`);
+    Raises:
+        *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions 
+    """
+    projectpath = opts['projectPath']
+    task = opts.get('antTask', 'pit')
+    clonepath = os.path.join('/tmp/mutation-testing', os.path.basename(projectpath), '')
+    src = os.path.join(clonepath, 'src', '')
+    pkg = os.path.join(src, 'com', 'example', '')
+    
+    # Copy the project to /tmp/ to avoid modifying the original
+    if os.path.exists(clonepath) and os.path.isdir(clonepath):
+        rmtree(clonepath)
+    copytree(projectpath, clonepath)
+    
+    # Create com.example package structure
+    os.makedirs(pkg)
 
-  // Add the package declaration to the top of Java files
-  await exec(`sed -i '1ipackage com.example;' ${path.join(pkg, '*.java')}`);
- 
-  // Prepare to run PIT using ANT
-  const antPath = path.join(__dirname, 'build.xml'); // path to shared build file
-  const libPath = path.join(__dirname, 'lib'); // path to shared libraries 
-  const { targetClasses, targetTests } = await getPitTargets(src); 
-  let cmd = `ant -f ${antPath} -Dbasedir=${clonePath} -Dresource_dir=${libPath} -Dtarget_classes=${targetClasses} -Dtarget_tests=${targetTests} ${antTask}`;
-  if (!log) {
-    cmd = cmd + ' > /dev/null 2>&1';
-  }
-  
-  // execute ANT
-  return execSync(cmd);
-}
+    # Move Java files directly under src into src/com/example
+    mvcmd = 'mv {javafiles} {package}' \
+            .format(javafiles=os.path.join(src, '*.java'), package=pkg)
+    subprocess.run(mvcmd, shell=True).check_returncode()
 
-/**
- * Compute package to point PIT at.
- *
- * @param src Directory containing Java source files
- * @return { targetClasses, targetTests }
- */
-async function getPitTargets(src) {
-  const dirTree = await traverseList(src, { relative: true } );
-  let targetClasses = [];
-  let targetTests = [];
-  let dirs = dirTree.map(p => path.dirname(p)); 
-  
-  dirs = [...new Set(dirs)]; // unique 
-  dirs.forEach(d => {
-    d = d.replace("/", ".");
-    let packageName;
-    if (d.endsWith(".")) {
-      packageName = `${d}*`; 
-    } else {
-      packageName = `${d}.*`; 
-    }
+    # Add package declaration to the top of Java files
+    sedcmd = 'gused' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
+    sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
+            .format(javafiles=os.path.join(pkg, '*.java'))
+    try:
+        subprocess.run(sedcmd, shell=True).check_returncode()
+    except subprocess.CalledProcessError as e:
+        if e.returncode == 127 and sys.platform == 'darwin':
+            print(('If you are on macOS, please install the GNU sed extension "gsed". '
+                    'To install: brew install gsed'))
+        sys.exit(0)
 
-    targetClasses.push(packageName);
-    targetTests.push(`${packageName}Test*`);
-  });
+    # Prepare to run PIT using ANT
+    wd = os.getcwd()
+    antpath = os.path.join(wd, 'build.xml')
+    libpath = os.path.join(wd, 'lib')
+    targetclasses, targettests = getpittargets(src)
+    antcmd = ('ant -f {} -Dbasedir={} '
+            '-Dresource_dir={} -Dtarget_classes={} -Dtarget_tests={} {}') \
+                    .format(antpath, clonepath, libpath, targetclasses, targettests, task)
+    result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE,
+            encoding='utf-8')
 
-  targetClasses = targetClasses.join(",");
-  targetTests = targetTests.join(",");
+    return result
 
-  return { targetClasses, targetTests };
-}
 
-run();
+def getpittargets(src):
+    """Walk down the dirtree starting at src and return code and test targets for PIT.
+
+    Arguments:
+        src (str): Path to the directory to start at
+
+    Returns:
+        A tuple containing (targetclasses, targettests). e.g. (com.example.*, com.example.*Test*)
+    """
+    targetclasses = []
+    targettests = []
+    for root, dirs, files in os.walk(src):
+        if files:
+            packagename = root.replace(src, '').replace(os.sep, '.')
+            targetclasses.append('{}.*'.format(packagename))
+            targettests.append('{}.*Test*'.format(packagename))
+
+    targetclasses = ','.join(targetclasses)
+    targettests = ','.join(targettests)
+
+    return (targetclasses, targettests)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
