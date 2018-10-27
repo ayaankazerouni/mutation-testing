@@ -71,7 +71,7 @@ def run(taskfile, log=False):
                 diff = time.time() - start
                 output = {
                         'success': True,
-                        'projectPath': opts.projectPath,
+                        'projectPath': opts['projectPath'],
                         'runningTime': diff
                     }
                 print(json.dumps(output))
@@ -125,7 +125,7 @@ def testsingleproject(opts, log):
     subprocess.run(mvcmd, shell=True).check_returncode()
 
     # Add package declaration to the top of Java files
-    sedcmd = 'gused' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
+    sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
     sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
             .format(javafiles=os.path.join(pkg, '*.java'))
     try:
