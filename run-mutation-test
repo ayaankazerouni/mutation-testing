@@ -32,6 +32,7 @@ const readline = require('readline');
 const fs = require('fs-extra');
 const promisify = require('util-promisify');
 const exec = promisify(require('child_process').exec);
+const execSync = require('child_process').execSync;
 const traverseList = promisify(require('fs-tree-traverse').list);
 
 if (process.argv.includes('-h') || process.argv.includes('--help')) {
@@ -88,7 +89,7 @@ function run() {
 
     if (log) {
       if (result) {
-        logOutput = result.stdout.replace('\\n', '\n');
+        logOutput = result.replace('\\n', '\n');
       }
 
       console.log(logOutput);
@@ -113,7 +114,7 @@ async function testSingleProject(options) {
   const src = path.join(clonePath, 'src');
   const pkg = path.join(src, 'com', 'example');
 
-  await fs.copy(projectPath, clonePath)
+  await fs.copy(projectPath, clonePath);
 
   // Create artificial package structure for items in the default package
   // so PIT doesn't try to mutate itself (src/com/example)
@@ -135,7 +136,7 @@ async function testSingleProject(options) {
   }
   
   // execute ANT
-  return exec(cmd);
+  return execSync(cmd);
 }
 
 /**
