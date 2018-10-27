@@ -71,7 +71,7 @@ def run(taskfile, log=False):
                 diff = time.time() - start
                 output = {
                         'success': True,
-                        'projectPath': opts.projectPath,
+                        'projectPath': opts['projectPath'],
                         'runningTime': diff
                     }
                 print(json.dumps(output))
