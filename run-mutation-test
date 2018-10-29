@@ -81,8 +81,8 @@ def run(taskfile, log=False):
                 diff = time.time() - start
                 output = {
                         'success': False,
-                        'projectPath': opts.projectPath,
-                        'message': repr(e),
+                        'projectPath': opts['projectPath'],
+                        'message': str(e),
                         'runningTime': diff
                     }
                 print(json.dumps(output))
@@ -146,6 +146,7 @@ def testsingleproject(opts, log):
                     .format(antpath, clonepath, libpath, targetclasses, targettests, task)
     result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE,
             encoding='utf-8')
+    result.check_returncode()
 
     return result
 
