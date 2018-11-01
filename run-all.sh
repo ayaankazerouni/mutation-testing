@@ -72,7 +72,7 @@ fi
 
 if [ "$SKIP_RUN" = false ] ; then
   echo "Starting mutation testing. This might take a while."
-  ./run-mutation-test ${TASKFILE} > /tmp/mutation-results.json
+  ./run_mutation_test.py ${TASKFILE} > /tmp/mutation-results.json
   echo "FINISHED"
   echo -e "\tRun summary in /tmp/mutation-results.json"
   echo -e "\tPITest reports in /tmp/mutation-testing/."
