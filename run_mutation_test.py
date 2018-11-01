@@ -105,7 +105,7 @@ def testsingleproject(opts, log):
     Raises:
         *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions 
     """
-    projectpath = opts['projectPath']
+    projectpath = os.path.normpath(opts['projectPath'])
     task = opts.get('antTask', 'pit')
     clonepath = os.path.join('/tmp/mutation-testing', os.path.basename(projectpath), '')
     src = os.path.join(clonepath, 'src', '')
