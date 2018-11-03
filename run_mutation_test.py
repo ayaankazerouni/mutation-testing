@@ -17,9 +17,9 @@ Mutation testing dependencies:
  - (on macOS) brew install gsed
 
 Usage:
- - Part of a parallel job, using GNU Parallel (see ./run-all)
- - Run as a CLI tool on one or more projects.
-   Usage: ./run-mutation-test -h
+ - Part of a batch job, using ./run-all (./run-all --help) 
+ - Run as a CLI tool on one or more projects using a task file.
+   Usage: ./run-mutation-test --help
 """
 
 import os
@@ -87,8 +87,7 @@ def run(taskfile, log=False):
                     }
                 print(json.dumps(output))
                 if log:
-                    print(e.stderr)
-                
+                    print(e.stdout)
 
 def testsingleproject(opts, log):
     """Run mutation testing on a single project.
@@ -98,6 +97,7 @@ def testsingleproject(opts, log):
 
     Arguments:
         options (dict): Containing the keys { projectPath (required), antTask (default "pit")
+        log (bool): To log or not to log, that is the question
 
     Returns:
         *subprocess.CompletedProcess*: The result of executing the ANT task
@@ -105,7 +105,7 @@ def testsingleproject(opts, log):
     Raises:
         *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions 
     """
-    projectpath = opts['projectPath']
+    projectpath = os.path.normpath(opts['projectPath'])
     task = opts.get('antTask', 'pit')
     clonepath = os.path.join('/tmp/mutation-testing', os.path.basename(projectpath), '')
     src = os.path.join(clonepath, 'src', '')
