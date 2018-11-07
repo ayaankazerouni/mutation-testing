@@ -1,0 +1,25 @@
+{
+  "name": "mutation-testing",
+  "author": "",
+  "version": "1.0.0",
+  "description": "",
+  "main": "run-mutation-test.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "dependencies": {
+    "fs-extra": "^5.0.0",
+    "fs-tree-traverse": "^0.1.0",
+    "util-promisify": "^2.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@bitbucket.org/ayaankazerouni/mutation-testing.git"
+  },
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/ayaankazerouni/mutation-testing#readme"
+}
