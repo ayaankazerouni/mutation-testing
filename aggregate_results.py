@@ -22,7 +22,7 @@ def __get_mutation_coverage(resultspath):
             'mutants': len(mutations),
             'survived': nsurvived,
             'killed': nkilled,
-            'coverage': coverage
+            'mutationCovered': coverage
         })
     else:
         return None 
