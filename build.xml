@@ -10,6 +10,7 @@
   <echo message="resource_dir = ${resource_dir}" />
   <echo message="basedir = ${basedir}" />
   <echo message="mutating: ${target_classes}" />
+  <echo message="with mutators: ${mutators}" />
   <echo message="using tests: ${target_tests}" />
 
   <!-- classpath for running the tests (project files and test libraries) -->
@@ -22,9 +23,7 @@
 
   <!-- classpath for pitest and its dependencies (including test libraries)-->
   <path id="pitest.path">
-    <pathelement location="${resource_dir}/junit-4.9.jar" />
-    <pathelement location="${resource_dir}/xstream-1.4.8.jar" />
-    <pathelement location="${resource_dir}/xmlpull-1.1.3.1.jar" />
+    <pathelement location="${resource_dir}/junit-4.12.jar" />
     <pathelement location="${resource_dir}/pitest-1.4.3.jar" />
     <pathelement location="${resource_dir}/pitest-entry-1.4.3.jar" />
     <pathelement location="${resource_dir}/pitest-ant-1.4.3.jar" />
@@ -116,7 +115,7 @@
       timestampedReports="false"
       sourceDir="src/"
       outputFormats="HTML,CSV"
-      mutators="REMOVE_CONDITIONALS,VOID_METHOD_CALLS,NON_VOID_METHOD_CALLS,CONSTRUCTOR_CALLS,TRUE_RETURNS,FALSE_RETURNS,PRIMITIVE_RETURNS,EMPTY_RETURNS"
+      mutators="${mutators}"
       />
   </target>
 
