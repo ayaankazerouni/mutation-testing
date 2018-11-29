@@ -123,7 +123,7 @@ def testsingleproject(opts):
     runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
     Arguments:
-        options (dict): Containing the keys { projectPath (required), antTask (default "pit")
+        opts (dict): Containing the keys { projectPath (required), antTask (default "pit")
 
     Returns:
         *subprocess.CompletedProcess*: The result of executing the ANT task
@@ -160,43 +160,34 @@ def testsingleproject(opts):
                    'To install: brew install gsed'))
         sys.exit(0)
 
-    result = __runant(clonepath)
-    return result
-
-def __runant(clonepath):
     cwd = os.getcwd()
     antpath = os.path.join(cwd, 'build.xml')
     libpath = os.path.join(cwd, 'lib')
-    targetclasses, targettests = getpittargets(os.path.join(clonepath, 'src', ''))
-    kwargs = {
+    antopts = {
         'antpath': antpath,
         'libpath': libpath,
-        'targetclasses': targetclasses,
-        'targettests': targettests,
         'clonepath': clonepath
     }
 
     if CONFIG['all_mutators']:
-        kwargs['mutators'] = ','.join(MUTATORS)
-        return __mutate(**kwargs)
+        antopts['mutators'] = ','.join(MUTATORS)
+        return __mutate(**antopts)
 
+    # use each mutation operator one-by-one
     for mutator in MUTATORS:
-        kwargs['mutators'] = mutator
-        kwargs['pitreports'] = os.path.join(clonepath, 'pitReports', mutator)
-        __mutate(**kwargs)
+        antopts['mutators'] = mutator
+        antopts['pitreports'] = os.path.join(clonepath, 'pitReports', mutator)
+        __mutate(**antopts)
         if CONFIG['log']:
             print('Finished mutating with {}'.format(mutator))
+        
+        # TODO: Aggregate results from multiple runs
 
     return None
 
-def __mutate(**kwargs):
-    antpath = kwargs['antpath']
-    clonepath = kwargs['clonepath']
-    libpath = kwargs['libpath']
-    targetclasses = kwargs['targetclasses']
-    targettests = kwargs['targettests']
-    mutators = kwargs['mutators']
-    pitreports = kwargs.get('pitreports', os.path.join(clonepath, 'pitReports'))
+def __mutate(antpath, clonepath, libpath, mutators, pitreports=None):
+    pitreports = os.path.join(clonepath, 'pitReports') if pitreports is None else pitreports
+    targetclasses, targettests = getpittargets(os.path.join(clonepath, 'src', ''))
     antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dtarget_classes={} '
               '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} {}') \
               .format(antpath, clonepath, libpath, targetclasses, targettests, mutators,
