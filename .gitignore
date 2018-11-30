@@ -9,6 +9,7 @@ __pycache__/
 .Rproj.user
 
 *-notebook.html
+.vscode
 tasks.json
 node_modules/
 data/

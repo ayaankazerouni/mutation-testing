@@ -2,12 +2,13 @@
 
 """
 Author: Ayaan Kazerouni <ayaan@vt.edu>
-Description: Run mutation analysis on projects from a taskFile. 
+Description: Run mutation analysis on projects from a taskFile.
 
 Overview:
  - Copy project to /tmp/
  - Create artificial package structure for the project so that
-   PIT doesn't try to mutate itself
+   PIT doesn't try to mutate itself (e.g., com.example)
+ - Assumes the following project structure: {project-root}/{src}/{*.java}
  - Run PIT from the ANT build file (assumed to be in the current directory)
 
 Mutation testing dependencies:
@@ -17,9 +18,10 @@ Mutation testing dependencies:
  - (on macOS) brew install gsed
 
 Usage:
- - Part of a batch job, using ./run-all (./run-all --help) 
+ - Part of a batch job, using ./run-all (see ./run-all --help)
  - Run as a CLI tool on one or more projects using a task file.
    Usage: ./run-mutation-test --help
+ - import run_mutation_test
 """
 
 import os
@@ -28,100 +30,122 @@ import json
 import time
 import subprocess
 from shutil import rmtree, copytree
+from aggregate_results import get_mutation_coverage
+
+MUTATORS = [
+    'REMOVE_CONDITIONALS',
+    'VOID_METHOD_CALLS',
+    'NON_VOID_METHOD_CALLS',
+    'CONSTRUCTOR_CALLS',
+    'TRUE_RETURNS',
+    'FALSE_RETURNS',
+    'PRIMITIVE_RETURNS',
+    'EMPTY_RETURNS'
+]
+
+# default values; might be modified once at startup and read-only thereafter
+CONFIG = {
+    'log': False,
+    'all_mutators': True
+}
 
 def main(args):
     """Entry point. Respond to CLI args and trigger execution."""
-    if any(x in args for x in [ '-h', '--help' ]):
-        usage()
-   
-    log = False
-    if any(x in args for x in [ '-l', '--log' ]):
-        log = True
+    if any(x in args for x in ['-h', '--help']):
+        printhelp()
+
+    if any(x in args for x in ['-l', '--log']):
+        CONFIG['log'] = True
+
+    if any(x in args for x in ['-s', '--steps']):
+        CONFIG['all_mutators'] = False
 
     taskfile = args[0]
-    run(taskfile, log=log)
+    run(taskfile)
 
-def usage():
+def printhelp():
     """Print usage info."""
     usage = '''
     Run mutation analysis on projects from a taskFile.
     Usage: ./run-mutation-test tasks.json [-l] [-h]
 
     taskFile\t NDJSON file containing tasks with the keys:
-    \t\t{ projectPath (required), antTask (default "pit") }
-    -l|--log\t Print stdout and stderr? Don't use this with GNU Parallel
+    \t\t{ projectPath (required) }
+    -l|--log\t Print stdout and stderr? Don't use this with ./run-all
     -h|--help\t Print this help (ignoring any other params)
+    -s|--steps\t Run testing in steps, one mutator at a time
     '''
     print(usage)
     sys.exit(1)
 
-def run(taskfile, log=False):
+def run(taskfile):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
     Arguments:
-        log (bool): Print full stdout/stderr?
+        taskfile (str): Path to an NDJSON file containing filepaths
     """
-    with open(taskfile) as f:
-        for line in f:
+    with open(taskfile) as infile:
+        for line in infile:
             opts = json.loads(line)
             start = time.time()
             try:
-                result = testsingleproject(opts, log)
-                diff = time.time() - start
-                output = {
+                result = testsingleproject(opts)
+                if result:
+                    diff = time.time() - start
+                    output = {
                         'success': True,
                         'projectPath': opts['projectPath'],
                         'runningTime': diff
-                    }
-                print(json.dumps(output))
-                if log:
-                    print(result.stdout)
-            except subprocess.CalledProcessError as e:
+                        }
+                    print(json.dumps(output))
+                    if CONFIG['log']:
+                        print(result.stdout)
+                elif CONFIG['log']:
+                    print(('Ran mutation testing for each individual mutator. '
+                           'Results in pitReports.'))
+            except subprocess.CalledProcessError as err:
                 diff = time.time() - start
                 output = {
-                        'success': False,
-                        'projectPath': opts['projectPath'],
-                        'message': str(e),
-                        'runningTime': diff
+                    'success': False,
+                    'projectPath': opts['projectPath'],
+                    'message': str(err),
+                    'runningTime': diff
                     }
                 print(json.dumps(output))
-                if log:
-                    print(e.stdout)
+                if CONFIG['log']:
+                    print(err.stdout)
 
-def testsingleproject(opts, log):
+def testsingleproject(opts):
     """Run mutation testing on a single project.
 
     This function has file system side effects. Copies the project to /tmp/ and
     runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
     Arguments:
-        options (dict): Containing the keys { projectPath (required), antTask (default "pit")
-        log (bool): To log or not to log, that is the question
+        opts (dict): Containing the keys { projectPath (required), antTask (default "pit")
 
     Returns:
         *subprocess.CompletedProcess*: The result of executing the ANT task
 
     Raises:
-        *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions 
+        *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions
     """
-    projectpath = os.path.normpath(opts['projectPath'])
-    task = opts.get('antTask', 'pit')
+    projectpath = os.path.normpath(os.path.expanduser(opts['projectPath']))
     clonepath = os.path.join('/tmp/mutation-testing', os.path.basename(projectpath), '')
-    src = os.path.join(clonepath, 'src', '')
-    pkg = os.path.join(src, 'com', 'example', '')
-    
+    pkg = os.path.join(clonepath, 'src', 'com', 'example', '')
+
     # Copy the project to /tmp/ to avoid modifying the original
     if os.path.exists(clonepath) and os.path.isdir(clonepath):
         rmtree(clonepath)
     copytree(projectpath, clonepath)
-    
+
     # Create com.example package structure
     os.makedirs(pkg)
 
     # Move Java files directly under src into src/com/example
     mvcmd = 'mv {javafiles} {package}' \
-            .format(javafiles=os.path.join(src, '*.java'), package=pkg)
+            .format(javafiles=os.path.join(clonepath, 'src', '*.java'), package=pkg)
     subprocess.run(mvcmd, shell=True).check_returncode()
 
     # Add package declaration to the top of Java files
@@ -130,26 +154,55 @@ def testsingleproject(opts, log):
             .format(javafiles=os.path.join(pkg, '*.java'))
     try:
         subprocess.run(sedcmd, shell=True).check_returncode()
-    except subprocess.CalledProcessError as e:
-        if e.returncode == 127 and sys.platform == 'darwin':
+    except subprocess.CalledProcessError as err:
+        if err.returncode == 127 and sys.platform == 'darwin':
             print(('If you are on macOS, please install the GNU sed extension "gsed". '
-                    'To install: brew install gsed'))
+                   'To install: brew install gsed'))
         sys.exit(0)
 
-    # Prepare to run PIT using ANT
-    wd = os.getcwd()
-    antpath = os.path.join(wd, 'build.xml')
-    libpath = os.path.join(wd, 'lib')
-    targetclasses, targettests = getpittargets(src)
-    antcmd = ('ant -f {} -Dbasedir={} '
-            '-Dresource_dir={} -Dtarget_classes={} -Dtarget_tests={} {}') \
-                    .format(antpath, clonepath, libpath, targetclasses, targettests, task)
+    cwd = os.getcwd()
+    antpath = os.path.join(cwd, 'build.xml')
+    libpath = os.path.join(cwd, 'lib')
+    antopts = {
+        'antpath': antpath,
+        'libpath': libpath,
+        'clonepath': clonepath
+    }
+
+    if CONFIG['all_mutators']:
+        antopts['mutators'] = ','.join(MUTATORS)
+        return __mutate(**antopts)
+
+    # use each mutation operator one-by-one
+    for mutator in MUTATORS:
+        antopts['mutators'] = mutator
+        antopts['pitreports'] = os.path.join(clonepath, 'pitReports', mutator)
+        __mutate(**antopts)
+        if CONFIG['log']:
+            print('Finished mutating with {}'.format(mutator))
+        
+        # TODO: Aggregate results from multiple runs
+
+    return None
+
+def __mutate(antpath, clonepath, libpath, mutators, pitreports=None):
+    pitreports = os.path.join(clonepath, 'pitReports') if pitreports is None else pitreports
+    targetclasses, targettests = getpittargets(os.path.join(clonepath, 'src', ''))
+    antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dtarget_classes={} '
+              '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} {}') \
+              .format(antpath, clonepath, libpath, targetclasses, targettests, mutators,
+                      pitreports, 'pit')
     result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE,
-            encoding='utf-8')
+                            encoding='utf-8')
     result.check_returncode()
 
-    return result
+    mutationresults = get_mutation_coverage(resultspath=os.path.join(pitreports, 'mutations.csv'),
+                                            getseries=False)
+    if mutationresults is not None:
+        with open(os.path.join(pitreports, 'results.json'), 'w') as resultfile:
+            json.dump(mutationresults, resultfile)
 
+    return result
 
 def getpittargets(src):
     """Walk down the dirtree starting at src and return code and test targets for PIT.
@@ -162,7 +215,7 @@ def getpittargets(src):
     """
     targetclasses = []
     targettests = []
-    for root, dirs, files in os.walk(src):
+    for root, _, files in os.walk(src):
         if files:
             packagename = root.replace(src, '').replace(os.sep, '.')
             targetclasses.append('{}.*'.format(packagename))
@@ -174,4 +227,8 @@ def getpittargets(src):
     return (targetclasses, targettests)
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    if sys.argv[1:]:
+        main(sys.argv[1:])
+    else:
+        print('Error! No args')
+        printhelp()

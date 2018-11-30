@@ -3,64 +3,72 @@
 """Utility to aggregate PITest mutation data for several projects
 into a CSV file for analysis.
 """
-
-import pandas as pd
 from os import listdir, path
 import argparse
+import pandas as pd
 
-def __get_mutation_coverage(resultspath):
-    names = [ 'fileName', 'className', 'mutator', 'method', 'lineNumber', \
-            'status', 'killingTest' ]
-    mutations = pd.read_csv(resultspath, names=names)
-    if len(mutations) > 0:
-        nkilled = len(mutations[mutations['status'] == 'KILLED'])
-        nsurvived = len(mutations) - nkilled
-        coverage = nkilled / len(mutations)
+def get_mutation_coverage(resultspath, getseries=True):
+    """Gets mutation coverage for the project at resultspath."""
+    names = ['fileName', 'className', 'mutator', 'method', 'lineNumber', \
+            'status', 'killingTest']
+    try:
+        mutations = pd.read_csv(resultspath, names=names)
+        if not mutations.empty:
+            killed = ['KILLED', 'TIMED_OUT'] # pylint: disable=unused-variable
+            nkilled = len(mutations.query('status in @killed'))
+            nsurvived = len(mutations) - nkilled
+            coverage = nkilled / len(mutations)
 
+            result = {
+                'mutants': len(mutations),
+                'survived': nsurvived,
+                'killed': nkilled,
+                'mutationCovered': coverage
+            }
 
-        return pd.Series({
-            'mutants': len(mutations),
-            'survived': nsurvived,
-            'killed': nkilled,
-            'mutationCovered': coverage
-        })
-    else:
-        return None 
+            if getseries:
+                return pd.Series(result)
 
-def aggregate_mutation_results(infile):
+            return result
+    except FileNotFoundError:
+        pass
+
+    return None
+
+def aggregate_mutation_results(dirpath):
     """
     Aggregate output from mutation testing by reading PITest reports.
 
     Args:
-        infile (str): Path to the directory containing tested projects
+        dirpath (str): Path to the directory containing tested projects
     """
-    if (not path.isabs(infile)):
-        infile = path.abspath(infile)
-    
-    projects = listdir(infile)
+    if not path.isabs(dirpath):
+        dirpath = path.abspath(dirpath)
+
+    projects = listdir(dirpath)
     resultpaths = {}
 
     for proj in projects:
-        projpath = path.join(infile, proj)
+        projpath = path.join(dirpath, proj)
         mutationscsv = path.join(projpath, 'pitReports', 'mutations.csv')
         mutationshtml = path.join(projpath, 'pitReports', 'com.example')
-        
+
         # are there mutation results to speak of?
         if path.isfile(mutationscsv) and path.isdir(mutationshtml):
             resultpaths[proj] = mutationscsv
 
-    mutationcoverage = pd.Series(resultpaths).apply(__get_mutation_coverage)
+    mutationcoverage = pd.Series(resultpaths).apply(get_mutation_coverage)
     mutationcoverage.index.name = 'userName'
     return mutationcoverage
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input', help='Path to PIT testing output')
-    parser.add_argument('output', help='Path to output CSV file')
-    args = parser.parse_args()
-    
-    infile = args.input
-    outfile = args.output
+    PARSER = argparse.ArgumentParser()
+    PARSER.add_argument('input', help='Path to PIT testing output')
+    PARSER.add_argument('output', help='Path to output CSV file')
+    ARGS = PARSER.parse_args()
 
-    results = aggregate_mutation_results(infile)
-    results.to_csv(path_or_buf=outfile, index=True)
+    INFILE = ARGS.input
+    OUTFILE = ARGS.output
+
+    RESULTS = aggregate_mutation_results(INFILE)
+    RESULTS.to_csv(path_or_buf=OUTFILE, index=True)
