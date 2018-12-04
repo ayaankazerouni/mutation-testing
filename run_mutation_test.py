@@ -29,8 +29,10 @@ import sys
 import json
 import time
 import subprocess
+import logging
 from shutil import rmtree, copytree
-from aggregate_results import get_mutation_coverage
+
+import aggregate_results
 
 MUTATORS = [
     'REMOVE_CONDITIONALS',
@@ -45,7 +47,6 @@ MUTATORS = [
 
 # default values; might be modified once at startup and read-only thereafter
 CONFIG = {
-    'log': False,
     'all_mutators': True
 }
 
@@ -55,7 +56,9 @@ def main(args):
         printhelp()
 
     if any(x in args for x in ['-l', '--log']):
-        CONFIG['log'] = True
+        logging.basicConfig(filename='mutation.log', level=logging.INFO)
+    else:
+        logging.basicConfig(filename='mutation.log', level=logging.WARN)
 
     if any(x in args for x in ['-s', '--steps']):
         CONFIG['all_mutators'] = False
@@ -99,11 +102,10 @@ def run(taskfile):
                         'runningTime': diff
                         }
                     print(json.dumps(output))
-                    if CONFIG['log']:
-                        print(result.stdout)
-                elif CONFIG['log']:
-                    print(('Ran mutation testing for each individual mutator. '
-                           'Results in pitReports.'))
+                    logging.info(result.stdout)
+                else:
+                    logging.info(('Ran mutation testing for each individual mutator. '
+                                  'Results in pitReports.'))
             except subprocess.CalledProcessError as err:
                 diff = time.time() - start
                 output = {
@@ -113,8 +115,7 @@ def run(taskfile):
                     'runningTime': diff
                     }
                 print(json.dumps(output))
-                if CONFIG['log']:
-                    print(err.stdout)
+                logging.info(err.stdout)
 
 def testsingleproject(opts):
     """Run mutation testing on a single project.
@@ -123,7 +124,7 @@ def testsingleproject(opts):
     runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
     Arguments:
-        opts (dict): Containing the keys { projectPath (required), antTask (default "pit")
+        opts (dict): Containing the keys { projectPath (required), antTask (default "pit") }
 
     Returns:
         *subprocess.CompletedProcess*: The result of executing the ANT task
@@ -132,7 +133,8 @@ def testsingleproject(opts):
         *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions
     """
     projectpath = os.path.normpath(os.path.expanduser(opts['projectPath']))
-    clonepath = os.path.join('/tmp/mutation-testing', os.path.basename(projectpath), '')
+    pname = os.path.basename(projectpath)
+    clonepath = os.path.join('/tmp/mutation-testing', pname, '')
     pkg = os.path.join(clonepath, 'src', 'com', 'example', '')
 
     # Copy the project to /tmp/ to avoid modifying the original
@@ -178,9 +180,8 @@ def testsingleproject(opts):
         antopts['mutators'] = mutator
         antopts['pitreports'] = os.path.join(clonepath, 'pitReports', mutator)
         __mutate(**antopts)
-        if CONFIG['log']:
-            print('Finished mutating with {}'.format(mutator))
-        
+        logging.info('%s: aFinished mutating with %s', pname, mutator)
+
         # TODO: Aggregate results from multiple runs
 
     return None
@@ -196,8 +197,10 @@ def __mutate(antpath, clonepath, libpath, mutators, pitreports=None):
                             encoding='utf-8')
     result.check_returncode()
 
-    mutationresults = get_mutation_coverage(resultspath=os.path.join(pitreports, 'mutations.csv'),
-                                            getseries=False)
+    mutationresults = aggregate_results.get_mutation_coverage(
+        resultspath=os.path.join(pitreports, 'mutations.csv'),
+        getseries=False
+    )
     if mutationresults is not None:
         with open(os.path.join(pitreports, 'results.json'), 'w') as resultfile:
             json.dump(mutationresults, resultfile)
