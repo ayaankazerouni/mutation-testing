@@ -32,8 +32,6 @@ import subprocess
 import logging
 from shutil import rmtree, copytree
 
-import aggregate_results
-
 def main(args):
     """Entry point. Respond to CLI args and trigger execution."""
     if any(x in args for x in ['-h', '--help']):
@@ -184,10 +182,7 @@ class MutationRunner:
         for mutator in MutationRunner.available_mutators:
             pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
             self.__mutate(mutator, pitreports=pitreports)
-            logging.info('%s: aFinished mutating with %s', self.projectname, mutator)
-
-            # TODO: Aggregate results from multiple runs
-
+            logging.info('%s: Finished mutating with %s', self.projectname, mutator)
         return None
 
     def __mutate(self, mutators, pitreports=None):
@@ -209,14 +204,6 @@ class MutationRunner:
         result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, encoding='utf-8')
         result.check_returncode()
-
-        mutationresults = aggregate_results.get_mutation_coverage(
-            resultspath=os.path.join(pitreports, 'mutations.csv'),
-            getseries=False
-        )
-        if mutationresults is not None:
-            with open(os.path.join(pitreports, 'results.json'), 'w') as resultfile:
-                json.dump(mutationresults, resultfile)
 
         return result
 
