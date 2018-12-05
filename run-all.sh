@@ -37,7 +37,7 @@ while (( "$#" )); do
       DEPTH=$2
       shift 2
       ;;
-    -h|--help)
+    -help)
       showhelp
       exit 0
       ;;

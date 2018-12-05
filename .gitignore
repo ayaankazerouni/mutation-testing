@@ -13,3 +13,5 @@ __pycache__/
 tasks.json
 node_modules/
 data/
+
+*.log

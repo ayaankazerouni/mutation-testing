@@ -29,39 +29,25 @@ import sys
 import json
 import time
 import subprocess
+import logging
 from shutil import rmtree, copytree
-from aggregate_results import get_mutation_coverage
-
-MUTATORS = [
-    'REMOVE_CONDITIONALS',
-    'VOID_METHOD_CALLS',
-    'NON_VOID_METHOD_CALLS',
-    'CONSTRUCTOR_CALLS',
-    'TRUE_RETURNS',
-    'FALSE_RETURNS',
-    'PRIMITIVE_RETURNS',
-    'EMPTY_RETURNS'
-]
-
-# default values; might be modified once at startup and read-only thereafter
-CONFIG = {
-    'log': False,
-    'all_mutators': True
-}
 
 def main(args):
     """Entry point. Respond to CLI args and trigger execution."""
     if any(x in args for x in ['-h', '--help']):
         printhelp()
 
+    loglevel = logging.WARN
     if any(x in args for x in ['-l', '--log']):
-        CONFIG['log'] = True
+        loglevel = logging.INFO
+    logging.basicConfig(filename='mutation.log', filemode='w', level=loglevel)
 
+    all_mutators = True
     if any(x in args for x in ['-s', '--steps']):
-        CONFIG['all_mutators'] = False
+        all_mutators = False
 
     taskfile = args[0]
-    run(taskfile)
+    run(taskfile, all_mutators)
 
 def printhelp():
     """Print usage info."""
@@ -78,7 +64,7 @@ def printhelp():
     print(usage)
     sys.exit(1)
 
-def run(taskfile):
+def run(taskfile, all_mutators=True):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
@@ -90,7 +76,13 @@ def run(taskfile):
             opts = json.loads(line)
             start = time.time()
             try:
-                result = testsingleproject(opts)
+                projectpath = opts['projectPath']
+                logging.info('Starting for %s', projectpath)
+                runner = MutationRunner(
+                    projectpath=projectpath,
+                    all_mutators=all_mutators
+                )
+                result = runner.testsingleproject()
                 if result:
                     diff = time.time() - start
                     output = {
@@ -99,11 +91,10 @@ def run(taskfile):
                         'runningTime': diff
                         }
                     print(json.dumps(output))
-                    if CONFIG['log']:
-                        print(result.stdout)
-                elif CONFIG['log']:
-                    print(('Ran mutation testing for each individual mutator. '
-                           'Results in pitReports.'))
+                    logging.info(result.stdout)
+                else:
+                    logging.info(('Ran mutation testing for each individual mutator. '
+                                  'Results in pitReports.'))
             except subprocess.CalledProcessError as err:
                 diff = time.time() - start
                 output = {
@@ -113,118 +104,131 @@ def run(taskfile):
                     'runningTime': diff
                     }
                 print(json.dumps(output))
-                if CONFIG['log']:
-                    print(err.stdout)
+                logging.error(err.stdout)
 
-def testsingleproject(opts):
-    """Run mutation testing on a single project.
+class MutationRunner:
+    """Runs mutation testing on a specified project.
 
-    This function has file system side effects. Copies the project to /tmp/ and
-    runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
-
-    Arguments:
-        opts (dict): Containing the keys { projectPath (required), antTask (default "pit")
-
-    Returns:
-        *subprocess.CompletedProcess*: The result of executing the ANT task
-
-    Raises:
-        *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions
+    Attributes:
+        projectpath (str): Absolute path to the project
     """
-    projectpath = os.path.normpath(os.path.expanduser(opts['projectPath']))
-    clonepath = os.path.join('/tmp/mutation-testing', os.path.basename(projectpath), '')
-    pkg = os.path.join(clonepath, 'src', 'com', 'example', '')
+    # class attributes
+    available_mutators = [
+        'REMOVE_CONDITIONALS',
+        'VOID_METHOD_CALLS',
+        'NON_VOID_METHOD_CALLS',
+        'CONSTRUCTOR_CALLS',
+        'TRUE_RETURNS',
+        'FALSE_RETURNS',
+        'PRIMITIVE_RETURNS',
+        'EMPTY_RETURNS'
+    ]
 
-    # Copy the project to /tmp/ to avoid modifying the original
-    if os.path.exists(clonepath) and os.path.isdir(clonepath):
-        rmtree(clonepath)
-    copytree(projectpath, clonepath)
+    def __init__(self, projectpath, antpath=None, libpath=None, all_mutators=True):
+        self.projectpath = os.path.normpath(os.path.expanduser(projectpath))
+        self.projectname = os.path.basename(self.projectpath)
+        self.clonepath = os.path.join('/tmp/mutation-testing', self.projectname, '')
+        self.all_mutators = all_mutators
+        cwd = os.getcwd()
+        self.antpath = antpath or os.path.join(cwd, 'build.xml')
+        self.libpath = libpath or os.path.join(cwd, 'lib')
 
-    # Create com.example package structure
-    os.makedirs(pkg)
+    def testsingleproject(self):
+        """Run mutation testing on a single project.
 
-    # Move Java files directly under src into src/com/example
-    mvcmd = 'mv {javafiles} {package}' \
-            .format(javafiles=os.path.join(clonepath, 'src', '*.java'), package=pkg)
-    subprocess.run(mvcmd, shell=True).check_returncode()
+        This function has file system side effects. Copies the project to /tmp/ and
+        runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
-    # Add package declaration to the top of Java files
-    sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
-    sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
-            .format(javafiles=os.path.join(pkg, '*.java'))
-    try:
-        subprocess.run(sedcmd, shell=True).check_returncode()
-    except subprocess.CalledProcessError as err:
-        if err.returncode == 127 and sys.platform == 'darwin':
-            print(('If you are on macOS, please install the GNU sed extension "gsed". '
-                   'To install: brew install gsed'))
-        sys.exit(0)
+        Arguments:
+            opts (dict): Containing the keys { projectPath (required), antTask (default "pit") }
 
-    cwd = os.getcwd()
-    antpath = os.path.join(cwd, 'build.xml')
-    libpath = os.path.join(cwd, 'lib')
-    antopts = {
-        'antpath': antpath,
-        'libpath': libpath,
-        'clonepath': clonepath
-    }
+        Returns:
+            *subprocess.CompletedProcess*: The result of executing the ANT task
 
-    if CONFIG['all_mutators']:
-        antopts['mutators'] = ','.join(MUTATORS)
-        return __mutate(**antopts)
+        Raises:
+            *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions
+        """
+        # Copy the project to /tmp/ to avoid modifying the original
+        if os.path.exists(self.clonepath) and os.path.isdir(self.clonepath):
+            rmtree(self.clonepath)
+        copytree(self.projectpath, self.clonepath)
 
-    # use each mutation operator one-by-one
-    for mutator in MUTATORS:
-        antopts['mutators'] = mutator
-        antopts['pitreports'] = os.path.join(clonepath, 'pitReports', mutator)
-        __mutate(**antopts)
-        if CONFIG['log']:
-            print('Finished mutating with {}'.format(mutator))
-        
-        # TODO: Aggregate results from multiple runs
+        # Create com.example package structure
+        pkg = os.path.join(self.clonepath, 'src', 'com', 'example', '')
+        os.makedirs(pkg)
 
-    return None
+        # Move Java files directly under src into src/com/example
+        mvcmd = 'mv {javafiles} {package}' \
+                .format(javafiles=os.path.join(self.clonepath, 'src', '*.java'), package=pkg)
+        subprocess.run(mvcmd, shell=True).check_returncode()
 
-def __mutate(antpath, clonepath, libpath, mutators, pitreports=None):
-    pitreports = os.path.join(clonepath, 'pitReports') if pitreports is None else pitreports
-    targetclasses, targettests = getpittargets(os.path.join(clonepath, 'src', ''))
-    antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dtarget_classes={} '
-              '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} {}') \
-              .format(antpath, clonepath, libpath, targetclasses, targettests, mutators,
-                      pitreports, 'pit')
-    result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE,
-                            encoding='utf-8')
-    result.check_returncode()
+        # Add package declaration to the top of Java files
+        sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
+        sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
+                .format(javafiles=os.path.join(pkg, '*.java'))
+        try:
+            subprocess.run(sedcmd, shell=True).check_returncode()
+        except subprocess.CalledProcessError as err:
+            if err.returncode == 127 and sys.platform == 'darwin':
+                logging.error(('If you are on macOS, please install the GNU sed extension "gsed". '
+                               'To install: brew install gsed'))
+            sys.exit(0)
 
-    mutationresults = get_mutation_coverage(resultspath=os.path.join(pitreports, 'mutations.csv'),
-                                            getseries=False)
-    if mutationresults is not None:
-        with open(os.path.join(pitreports, 'results.json'), 'w') as resultfile:
-            json.dump(mutationresults, resultfile)
+        if self.all_mutators:
+            mutators = ','.join(MutationRunner.available_mutators)
+            return self.__mutate(mutators)
 
-    return result
+        # use each mutation operator one-by-one
+        for mutator in MutationRunner.available_mutators:
+            pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
+            self.__mutate(mutator, pitreports=pitreports)
+            logging.info('%s: Finished mutating with %s', self.projectname, mutator)
+        return None
 
-def getpittargets(src):
-    """Walk down the dirtree starting at src and return code and test targets for PIT.
+    def __mutate(self, mutators, pitreports=None):
+        if pitreports is None:
+            pitreports = os.path.join(self.clonepath, 'pitReports')
+        targetclasses, targettests = self.getpittargets(os.path.join(self.clonepath, 'src', ''))
+        antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dtarget_classes={} '
+                  '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} pit') \
+                  .format(
+                      self.antpath,
+                      self.clonepath,
+                      self.libpath,
+                      targetclasses,
+                      targettests,
+                      mutators,
+                      pitreports
+                  )
+        logging.info('ANT command: %s', antcmd)
+        result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, encoding='utf-8')
+        result.check_returncode()
 
-    Arguments:
-        src (str): Path to the directory to start at
+        return result
 
-    Returns:
-        A tuple containing (targetclasses, targettests). e.g. (com.example.*, com.example.*Test*)
-    """
-    targetclasses = []
-    targettests = []
-    for root, _, files in os.walk(src):
-        if files:
-            packagename = root.replace(src, '').replace(os.sep, '.')
-            targetclasses.append('{}.*'.format(packagename))
-            targettests.append('{}.*Test*'.format(packagename))
+    def getpittargets(self, src):
+        """Walk down the dirtree starting at src and return code and test targets for PIT
+        as Java class globs.
 
-    targetclasses = ','.join(targetclasses)
-    targettests = ','.join(targettests)
+        Arguments: .
+            src (str): Path to the directory to start at
 
-    return (targetclasses, targettests)
+        Returns:
+            (str, str). e.g. (com.example.*, com.example.*Test*)
+        """
+        targetclasses = []
+        targettests = []
+        for root, _, files in os.walk(src):
+            if files:
+                packagename = root.replace(src, '').replace(os.sep, '.')
+                targetclasses.append('{}.*'.format(packagename))
+                targettests.append('{}.*Test*'.format(packagename))
+
+        targetclasses = ','.join(targetclasses)
+        targettests = ','.join(targettests)
+
+        return (targetclasses, targettests)
 
 if __name__ == '__main__':
     if sys.argv[1:]:

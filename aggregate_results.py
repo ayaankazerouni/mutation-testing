@@ -7,7 +7,7 @@ from os import listdir, path
 import argparse
 import pandas as pd
 
-def get_mutation_coverage(resultspath, getseries=True):
+def get_mutation_coverage(resultspath):
     """Gets mutation coverage for the project at resultspath."""
     names = ['fileName', 'className', 'mutator', 'method', 'lineNumber', \
             'status', 'killingTest']
@@ -26,14 +26,14 @@ def get_mutation_coverage(resultspath, getseries=True):
                 'mutationCovered': coverage
             }
 
-            if getseries:
-                return pd.Series(result)
-
-            return result
+            return pd.Series(result)
     except FileNotFoundError:
         pass
 
     return None
+
+def __combine_mutation_coverage(resultspath):
+    return pd.Series(get_mutation_coverage(resultspath))
 
 def aggregate_mutation_results(dirpath):
     """
@@ -57,7 +57,7 @@ def aggregate_mutation_results(dirpath):
         if path.isfile(mutationscsv) and path.isdir(mutationshtml):
             resultpaths[proj] = mutationscsv
 
-    mutationcoverage = pd.Series(resultpaths).apply(get_mutation_coverage)
+    mutationcoverage = pd.Series(resultpaths).apply(__combine_mutation_coverage)
     mutationcoverage.index.name = 'userName'
     return mutationcoverage
 
