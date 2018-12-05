@@ -26,13 +26,13 @@ def get_mutation_coverage(resultspath):
                 'mutationCovered': coverage
             }
 
-            return pd.Series(result)
+            return result
     except FileNotFoundError:
         pass
 
     return None
 
-def __combine_mutation_coverage(resultspath):
+def __combiner(resultspath):
     return pd.Series(get_mutation_coverage(resultspath))
 
 def aggregate_mutation_results(dirpath):
@@ -57,7 +57,7 @@ def aggregate_mutation_results(dirpath):
         if path.isfile(mutationscsv) and path.isdir(mutationshtml):
             resultpaths[proj] = mutationscsv
 
-    mutationcoverage = pd.Series(resultpaths).apply(__combine_mutation_coverage)
+    mutationcoverage = pd.Series(resultpaths).apply(__combiner)
     mutationcoverage.index.name = 'userName'
     return mutationcoverage
 

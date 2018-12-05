@@ -4,8 +4,9 @@
 PARAMS=""
 
 # default values
-PROJECTDIR=~/Developer/student-projects/testsubmissions
+PROJECTDIR=~/Developer/student-projects/testsubs
 TASKFILE=tasks.json
+STEPS=""
 SKIP_TASKS=false
 SKIP_RUN=false
 DEPTH=1
@@ -19,6 +20,7 @@ showhelp () {
   echo "Named arguments:"
   echo -e "\t-d --find-depth: Exact depth at which to find directories to mutate, within PROJECTDIR"
   echo "Options:"
+  echo -e "\t-s: Run testing with one mutation operator at a time?"
   echo -e "\t-t: Skip generating a task file? Use this if you already have tasks written to a file."
   echo -e "\t-r: Skip mutation testing? Convenient to only write tasks."
 }
@@ -33,8 +35,11 @@ while (( "$#" )); do
       SKIP_RUN=true
       shift
       ;;
-    -d|--find-depth)
-      DEPTH=$2
+    -s)
+      STEPS="-s"
+      shift
+      ;;
+    -d|--find-depth) DEPTH=$2
       shift 2
       ;;
     -help)
@@ -72,7 +77,7 @@ fi
 
 if [ "$SKIP_RUN" = false ] ; then
   echo "Starting mutation testing. This might take a while."
-  ./run_mutation_test.py ${TASKFILE} > /tmp/mutation-results.json
+  ./run_mutation_test.py ${TASKFILE} ${STEPS} > /tmp/mutation-results.json
   echo "FINISHED"
   echo -e "\tRun summary in /tmp/mutation-results.json"
   echo -e "\tPITest reports in /tmp/mutation-testing/."

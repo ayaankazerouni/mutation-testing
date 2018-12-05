@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-
 """
 Author: Ayaan Kazerouni <ayaan@vt.edu>
 Description: Run mutation analysis on projects from a taskFile.
@@ -20,7 +19,7 @@ Mutation testing dependencies:
 Usage:
  - Part of a batch job, using ./run-all (see ./run-all --help)
  - Run as a CLI tool on one or more projects using a task file.
-   Usage: ./run-mutation-test --help
+   Usage: see ./run-mutation-test --help
  - import run_mutation_test
 """
 
@@ -31,6 +30,8 @@ import time
 import subprocess
 import logging
 from shutil import rmtree, copytree
+
+import aggregate_results
 
 def main(args):
     """Entry point. Respond to CLI args and trigger execution."""
@@ -73,38 +74,62 @@ def run(taskfile, all_mutators=True):
     """
     with open(taskfile) as infile:
         for line in infile:
-            opts = json.loads(line)
-            start = time.time()
-            try:
-                projectpath = opts['projectPath']
-                logging.info('Starting for %s', projectpath)
-                runner = MutationRunner(
-                    projectpath=projectpath,
-                    all_mutators=all_mutators
-                )
-                result = runner.testsingleproject()
-                if result:
-                    diff = time.time() - start
-                    output = {
-                        'success': True,
-                        'projectPath': opts['projectPath'],
-                        'runningTime': diff
-                        }
-                    print(json.dumps(output))
-                    logging.info(result.stdout)
-                else:
-                    logging.info(('Ran mutation testing for each individual mutator. '
-                                  'Results in pitReports.'))
-            except subprocess.CalledProcessError as err:
-                diff = time.time() - start
+            __run_for_project(line, all_mutators)
+
+def __run_for_project(task, all_mutators):
+    opts = json.loads(task)
+    start = time.time()
+    try:
+        projectpath = opts['projectPath']
+        logging.info('Starting for %s', projectpath)
+        runner = MutationRunner(
+            projectpath=projectpath,
+            all_mutators=all_mutators
+        )
+        mutationoutput = runner.testsingleproject()
+        diff = time.time() - start
+        if all_mutators:
+            # mutationoutput is a tuple
+            coverage, result = mutationoutput
+            if result.returncode == 0:
+                output = {
+                    'success': True,
+                    'projectPath': opts['projectPath'],
+                    'runningTime': diff,
+                    'coverage': coverage
+                    }
+                print(json.dumps(output))
+                logging.info('%s: All operators', runner.projectname)
+                logging.info(result.stdout)
+            else:
                 output = {
                     'success': False,
                     'projectPath': opts['projectPath'],
-                    'message': str(err),
                     'runningTime': diff
                     }
                 print(json.dumps(output))
-                logging.error(err.stdout)
+                logging.error('%s: All operators', runner.projectname)
+                logging.error(result.stderr)
+        else:
+            # mutationoutput is a dict
+            output = {
+                'projectPath': opts['projectPath'],
+                'runningTime': diff
+            }
+            successes = []
+            for key, value in mutationoutput.items():
+                coverage, result = value # this is a tuple
+                if result.returncode > 0 or coverage is None:
+                    logging.error('%s: %s', runner.projectname, key)
+                    logging.error(result.stderr)
+                    successes.append(True)
+                else:
+                    output[key] = coverage
+                    successes.append(False)
+                    logging.info('%s: %s', runner.projectname, key)
+                    logging.info(result.stdout)
+            output['success'] = all(successes)
+            print(json.dumps(output))
 
 class MutationRunner:
     """Runs mutation testing on a specified project.
@@ -124,7 +149,8 @@ class MutationRunner:
         'EMPTY_RETURNS'
     ]
 
-    def __init__(self, projectpath, antpath=None, libpath=None, all_mutators=True):
+    def __init__(self, projectpath, antpath=None, libpath=None,
+                 all_mutators=True):
         self.projectpath = os.path.normpath(os.path.expanduser(projectpath))
         self.projectname = os.path.basename(self.projectpath)
         self.clonepath = os.path.join('/tmp/mutation-testing', self.projectname, '')
@@ -139,14 +165,16 @@ class MutationRunner:
         This function has file system side effects. Copies the project to /tmp/ and
         runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
-        Arguments:
-            opts (dict): Containing the keys { projectPath (required), antTask (default "pit") }
+        The method returns a (float, CompletedSubprocess)  tuple if all
+        available mutators are used, or a dict of (float, CompletedSubprocess) 
+        tuples if operators are applied one after the other, with each key being
+        the name of a mutant.
 
         Returns:
-            *subprocess.CompletedProcess*: The result of executing the ANT task
-
-        Raises:
-            *subprocess.CalledProcessError*: If any CLI utils invoked by subprocess cause exceptions
+            (float, CompletedProcess): The coverage percentage and the completed
+                                       subprocess, or
+            (dict): The coverage percentages and completed subprocess for each 
+                    mutation operator (if not self.all_mutators)
         """
         # Copy the project to /tmp/ to avoid modifying the original
         if os.path.exists(self.clonepath) and os.path.isdir(self.clonepath):
@@ -175,20 +203,36 @@ class MutationRunner:
             sys.exit(0)
 
         if self.all_mutators:
+            pitreports = os.path.join(self.clonepath, 'pitReports')
             mutators = ','.join(MutationRunner.available_mutators)
-            return self.__mutate(mutators)
+            result = self.__mutate(mutators, pitreports)
+            # look for the CSV file PIT creates
+            coveragecsv = os.path.join(pitreports, 'mutations.csv')
+            coverage = aggregate_results.get_mutation_coverage(coveragecsv)
+            if coverage is None:
+                return (None, result)
+            return (coverage['mutationCovered'], result)
 
         # use each mutation operator one-by-one
+        results = {}
         for mutator in MutationRunner.available_mutators:
             pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
-            self.__mutate(mutator, pitreports=pitreports)
+            result = self.__mutate(mutator, pitreports=pitreports)
+            if result.returncode > 0:
+                logging.error('%s: Error running without operator %s',
+                              self.projectname, mutator)
+            else:
+                coveragecsv = os.path.join(pitreports, 'mutations.csv')
+                coverage = aggregate_results.get_mutation_coverage(coveragecsv)
+                if coverage is None:
+                    results[mutator] = (None, result)
+                else:
+                    results[mutator] = (coverage['mutationCovered'], result)
             logging.info('%s: Finished mutating with %s', self.projectname, mutator)
-        return None
+        return results
 
-    def __mutate(self, mutators, pitreports=None):
-        if pitreports is None:
-            pitreports = os.path.join(self.clonepath, 'pitReports')
-        targetclasses, targettests = self.getpittargets(os.path.join(self.clonepath, 'src', ''))
+    def __mutate(self, mutators, pitreports):
+        targetclasses, targettests = self.getpittargets()
         antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dtarget_classes={} '
                   '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} pit') \
                   .format(
@@ -203,20 +247,16 @@ class MutationRunner:
         logging.info('ANT command: %s', antcmd)
         result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, encoding='utf-8')
-        result.check_returncode()
-
         return result
 
-    def getpittargets(self, src):
-        """Walk down the dirtree starting at src and return code and test targets for PIT
-        as Java class globs.
-
-        Arguments: .
-            src (str): Path to the directory to start at
+    def getpittargets(self):
+        """Walk down the dirtree starting at the project source and return code and
+        test targets for PIT as Java class globs.
 
         Returns:
             (str, str). e.g. (com.example.*, com.example.*Test*)
         """
+        src = os.path.join(self.clonepath, 'src', '')
         targetclasses = []
         targettests = []
         for root, _, files in os.walk(src):
