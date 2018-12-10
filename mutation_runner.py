@@ -19,8 +19,8 @@ Mutation testing dependencies:
 Usage:
  - Part of a batch job, using ./run-all (see ./run-all --help)
  - Run as a CLI tool on one or more projects using a task file.
-   Usage: see ./run-mutation-test --help
- - import run_mutation_test
+   Usage: see ./mutation_runner --help
+ - import mutation_runner
 """
 
 import os
@@ -216,6 +216,7 @@ class MutationRunner:
             if result.returncode > 0:
                 logging.error('%s: Error running without operator %s',
                               self.projectname, mutator)
+                results[mutator] = (None, result)
             else:
                 coveragecsv = os.path.join(pitreports, 'mutations.csv')
                 coverage = aggregate_results.get_mutation_coverage(coveragecsv)

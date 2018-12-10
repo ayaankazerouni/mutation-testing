@@ -27,7 +27,6 @@
     <pathelement location="${resource_dir}/pitest-1.4.3.jar" />
     <pathelement location="${resource_dir}/pitest-entry-1.4.3.jar" />
     <pathelement location="${resource_dir}/pitest-ant-1.4.3.jar" />
-    <pathelement location="${resource_dir}/commons-codec-1.11.jar" />
     <pathelement location="${resource_dir}/student.jar"/>
   </path>
 
