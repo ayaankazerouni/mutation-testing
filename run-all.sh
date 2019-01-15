@@ -42,7 +42,7 @@ while (( "$#" )); do
     -d|--find-depth) DEPTH=$2
       shift 2
       ;;
-    -help)
+    -h|--help)
       showhelp
       exit 0
       ;;

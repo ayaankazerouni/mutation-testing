@@ -2,6 +2,7 @@ projects/*
 lib/
 *.ipynb
 __pycache__/
+sandbox.py
 
 *.Rproj*
 .Rhistory
@@ -15,3 +16,4 @@ node_modules/
 data/
 
 *.log
+nohup.out

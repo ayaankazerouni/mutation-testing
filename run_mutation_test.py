@@ -19,7 +19,7 @@ Mutation testing dependencies:
 Usage:
  - Part of a batch job, using ./run-all (see ./run-all --help)
  - Run as a CLI tool on one or more projects using a task file.
-   Usage: see ./run-mutation-test --help
+   Usage: see ./run_mutation_test --help
  - import run_mutation_test
 """
 
@@ -58,7 +58,7 @@ def printhelp():
 
     taskFile\t NDJSON file containing tasks with the keys:
     \t\t{ projectPath (required) }
-    -l|--log\t Print stdout and stderr? Don't use this with ./run-all
+    -l|--log\t Print stdout and stderr?
     -h|--help\t Print this help (ignoring any other params)
     -s|--steps\t Run testing in steps, one mutator at a time
     '''
@@ -69,7 +69,7 @@ def run(taskfile, all_mutators=True):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
-    Arguments:
+    Args:
         taskfile (str): Path to an NDJSON file containing filepaths
     """
     with open(taskfile) as infile:
@@ -121,21 +121,17 @@ def __run_for_project(task, all_mutators):
             if result.returncode > 0 or coverage is None:
                 logging.error('%s: %s', runner.projectname, key)
                 logging.error(result.stderr)
-                successes.append(True)
+                successes.append(False)
             else:
                 output[key] = coverage
-                successes.append(False)
+                successes.append(True)
                 logging.info('%s: %s', runner.projectname, key)
                 logging.info(result.stdout)
         output['success'] = all(successes)
         print(json.dumps(output))
 
 class MutationRunner:
-    """Runs mutation testing on a specified project.
-
-    Attributes:
-        projectpath (str): Absolute path to the project
-    """
+    """Runs mutation testing on a specified project."""
     # class attributes
     available_mutators = [
         'REMOVE_CONDITIONALS',
@@ -218,7 +214,7 @@ class MutationRunner:
             pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
             result = self.__mutate(mutator, pitreports=pitreports)
             if result.returncode > 0:
-                logging.error('%s: Error running without operator %s',
+                logging.error('%s: Error running operator %s',
                               self.projectname, mutator)
             else:
                 coveragecsv = os.path.join(pitreports, 'mutations.csv')
