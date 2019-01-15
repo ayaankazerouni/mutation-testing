@@ -79,57 +79,56 @@ def run(taskfile, all_mutators=True):
 def __run_for_project(task, all_mutators):
     opts = json.loads(task)
     start = time.time()
-    try:
-        projectpath = opts['projectPath']
-        logging.info('Starting for %s', projectpath)
-        runner = MutationRunner(
-            projectpath=projectpath,
-            all_mutators=all_mutators
-        )
-        mutationoutput = runner.testsingleproject()
-        diff = time.time() - start
-        if all_mutators:
-            # mutationoutput is a tuple
-            coverage, result = mutationoutput
-            if result.returncode == 0:
-                output = {
-                    'success': True,
-                    'projectPath': opts['projectPath'],
-                    'runningTime': diff,
-                    'coverage': coverage
-                    }
-                print(json.dumps(output))
-                logging.info('%s: All operators', runner.projectname)
-                logging.info(result.stdout)
-            else:
-                output = {
-                    'success': False,
-                    'projectPath': opts['projectPath'],
-                    'runningTime': diff
-                    }
-                print(json.dumps(output))
-                logging.error('%s: All operators', runner.projectname)
-                logging.error(result.stderr)
-        else:
-            # mutationoutput is a dict
+    projectpath = opts['projectPath']
+    logging.info('Starting for %s', projectpath)
+    runner = MutationRunner(
+        projectpath=projectpath,
+        all_mutators=all_mutators
+    )
+    mutationoutput = runner.testsingleproject()
+    diff = time.time() - start
+    if all_mutators:
+        # mutationoutput is a tuple
+        coverage, result = mutationoutput
+        if result.returncode == 0:
             output = {
+                'success': True,
+                'projectPath': opts['projectPath'],
+                'runningTime': diff,
+                'coverage': coverage
+                }
+            print(json.dumps(output))
+            logging.info('%s: All operators', runner.projectname)
+            logging.info(result.stdout)
+        else:
+            output = {
+                'success': False,
                 'projectPath': opts['projectPath'],
                 'runningTime': diff
-            }
-            successes = []
-            for key, value in mutationoutput.items():
-                coverage, result = value # this is a tuple
-                if result.returncode > 0 or coverage is None:
-                    logging.error('%s: %s', runner.projectname, key)
-                    logging.error(result.stderr)
-                    successes.append(True)
-                else:
-                    output[key] = coverage
-                    successes.append(False)
-                    logging.info('%s: %s', runner.projectname, key)
-                    logging.info(result.stdout)
-            output['success'] = all(successes)
+                }
             print(json.dumps(output))
+            logging.error('%s: All operators', runner.projectname)
+            logging.error(result.stderr)
+    else:
+        # mutationoutput is a dict
+        output = {
+            'projectPath': opts['projectPath'],
+            'runningTime': diff
+        }
+        successes = []
+        for key, value in mutationoutput.items():
+            coverage, result = value # this is a tuple
+            if result.returncode > 0 or coverage is None:
+                logging.error('%s: %s', runner.projectname, key)
+                logging.error(result.stderr)
+                successes.append(True)
+            else:
+                output[key] = coverage
+                successes.append(False)
+                logging.info('%s: %s', runner.projectname, key)
+                logging.info(result.stdout)
+        output['success'] = all(successes)
+        print(json.dumps(output))
 
 class MutationRunner:
     """Runs mutation testing on a specified project.
@@ -166,14 +165,14 @@ class MutationRunner:
         runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
         The method returns a (float, CompletedSubprocess)  tuple if all
-        available mutators are used, or a dict of (float, CompletedSubprocess) 
+        available mutators are used, or a dict of (float, CompletedSubprocess)
         tuples if operators are applied one after the other, with each key being
         the name of a mutant.
 
         Returns:
             (float, CompletedProcess): The coverage percentage and the completed
                                        subprocess, or
-            (dict): The coverage percentages and completed subprocess for each 
+            (dict): The coverage percentages and completed subprocess for each
                     mutation operator (if not self.all_mutators)
         """
         # Copy the project to /tmp/ to avoid modifying the original
