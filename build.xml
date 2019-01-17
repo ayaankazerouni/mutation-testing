@@ -3,6 +3,7 @@
   <property name="report_dir" value="${basedir}/reports/"/>
   <property name="bin_dir" value="${basedir}/bin/"/>
   <property name="pit_reports" value="${basedir}/pitReports" />
+  <property name="plus_resources" value="${resource_dir}/pitestPlus" />
   <!-- timeout is in milliseconds -->
   <property name="exec.timeout" value="120000"/>
   <property name="build.compiler" value="modern"/>
@@ -27,11 +28,21 @@
     <pathelement location="${resource_dir}/pitest-1.4.3.jar" />
     <pathelement location="${resource_dir}/pitest-entry-1.4.3.jar" />
     <pathelement location="${resource_dir}/pitest-ant-1.4.3.jar" />
-    <pathelement location="${resource_dir}/commons-codec-1.11.jar" />
+    <pathelement location="${resource_dir}/student.jar"/>
+  </path>
+
+  <path id="pitest.plus.path">
+    <pathelement location="${resource_dir}/junit-4.12.jar" />
+    <pathelement location="${plus_resources}/pitestPlus.jar" />
+    <pathelement location="${plus_resources}/pitest-ant.jar" />
+    <pathelement location="${plus_resources}/pitest-command-line.jar" />
+    <pathelement location="${plus_resources}/commons-codec-1.11.jar" />
+    <pathelement location="${plus_resources}/xstream-1.4.11.1.jar" />
     <pathelement location="${resource_dir}/student.jar"/>
   </path>
 
   <taskdef name="pitest" classname="org.pitest.ant.PitestTask" classpathref="pitest.path" />
+  <taskdef name="pitestPlus" classname="org.pitest.ant.PitestTask" classpathref="pitest.plus.path" />
 
   <!-- delete output from previous runs -->
   <target name="clean">
@@ -106,6 +117,21 @@
   <!-- run PIT mutation testing -->
   <target name="pit" depends="compile">
     <pitest pitClasspath="pitest.path"
+      threads="2"
+      classPath="mutation.classpath"
+      targetTests="${target_tests}"
+      targetClasses="${target_classes}"
+      excludedClasses="${target_tests}"
+      reportDir="${pit_reports}"
+      timestampedReports="false"
+      sourceDir="src/"
+      outputFormats="HTML,CSV"
+      mutators="${mutators}"
+      />
+  </target>
+
+  <target name="pitPlus" depends="compile">
+    <pitestPlus pitClasspath="pitest.plus.path"
       threads="2"
       classPath="mutation.classpath"
       targetTests="${target_tests}"
