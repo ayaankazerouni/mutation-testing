@@ -56,7 +56,7 @@ def printhelp():
     """Print usage info."""
     usage = '''
     Run mutation analysis on projects from a taskFile.
-    Usage: ./run-mutation-test tasks.json [-l] [-h]
+    Usage: ./run-mutation-test taskFile [-l] [-h]
 
     taskFile\t NDJSON file containing tasks with the keys:
     \t\t{ projectPath (required) }
@@ -152,7 +152,7 @@ class MutationRunner:
     ]
 
     extended_mutators = [
-        'ABS',
+        'EXPERIMENTAL_ABS',
         'AOD',
         'AOR',
         'CRCR',
