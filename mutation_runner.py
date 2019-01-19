@@ -138,9 +138,15 @@ def __run_for_project(task, all_mutators, pitplus):
         print(json.dumps(output))
 
 class MutationRunner:
-    """Runs mutation testing on a specified project."""
+    """Runs mutation testing on a specified project.
+
+    Class Attributes:
+        reduced_mutators (list): Reduced set of PIT mutators, based on Offut et al.
+        pit_mutators (list): Other mutators available in PIT, used by Laurent et al.
+        extended_mutators (list): Extended mutators proposed by Laurent et al.
+    """
     # class attributes
-    available_mutators = [
+    reduced_mutators = [
         'REMOVE_CONDITIONALS',
         'VOID_METHOD_CALLS',
         'NON_VOID_METHOD_CALLS',
@@ -149,6 +155,18 @@ class MutationRunner:
         'FALSE_RETURNS',
         'PRIMITIVE_RETURNS',
         'EMPTY_RETURNS'
+    ]
+
+    pit_mutators = [
+        'CONDITIONALS_BOUNDARY',
+        'NEGATE_CONDITIONALS',
+        'MATH',
+        'INCREMENTS',
+        'INVERT_NEGS',
+        'INLINE_CONSTS',
+        'RETURN_VALS',
+        'EXPERIMENTAL_MEMBER_VARIABLE',
+        'EXPERIMENTAL_SWITCH'
     ]
 
     extended_mutators = [
@@ -171,10 +189,6 @@ class MutationRunner:
         cwd = os.getcwd()
         self.antpath = antpath or os.path.join(cwd, 'build.xml')
         self.libpath = libpath or os.path.join(cwd, 'lib')
-
-        if self.pitplus:
-            MutationRunner.available_mutators = MutationRunner.available_mutators + \
-                MutationRunner.extended_mutators
 
     def testsingleproject(self):
         """Run mutation testing on a single project.
@@ -219,9 +233,12 @@ class MutationRunner:
                                'To install: brew install gsed'))
             sys.exit(0)
 
+        mutators = self.reduced_mutators
+        if self.pitplus:
+            mutators = self.reduced_mutators + self.pit_mutators + self.extended_mutators
+
         if self.all_mutators:
             pitreports = os.path.join(self.clonepath, 'pitReports')
-            mutators = ','.join(MutationRunner.available_mutators)
             result = self.__mutate(mutators, pitreports)
             # look for the CSV file PIT creates
             coveragecsv = os.path.join(pitreports, 'mutations.csv')
@@ -232,7 +249,7 @@ class MutationRunner:
 
         # use each mutation operator one-by-one
         results = {}
-        for mutator in MutationRunner.available_mutators:
+        for mutator in mutators:
             pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
             result = self.__mutate(mutator, pitreports=pitreports)
             if result.returncode > 0:
