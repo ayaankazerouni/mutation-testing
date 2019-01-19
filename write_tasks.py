@@ -1,13 +1,15 @@
 #! /usr/bin/env python3
+"""
+Author: Ayaan Kazerouni <ayaan@vt.edu>
+Description: Grab sample projects from the specified directory.
+"""
 
-"""Grabs sample projects from the specified directory."""
-# pylint: skip-file
 import os
 import sys
 import json
 import random
 
-def printhelp():
+def _printhelp():
     print("Write paths to projects for mutation testing as JSON tasks.")
     print('\nRequired arguments:')
     print('\tinfile: A path to a mutation-results.json file if -s is specified,')
@@ -20,7 +22,14 @@ def printhelp():
     sys.exit(0)
 
 
-def write_successful(resultpath, n):
+def write_successful(resultpath, n_projects):
+    """Write out paths to projects where mutation testing was successful.
+    Requires a mutation-results.json file.
+
+    Args:
+        resultpath (str): Path to a mutation-results.json file
+        n_projects (int): The number of projects to print out (randomly sampled)
+    """
     projects = []
     with open(resultpath, 'r') as infile:
         for line in infile:
@@ -28,37 +37,37 @@ def write_successful(resultpath, n):
             if data['success']:
                 projects.append(data['projectPath'])
 
-    if n is not None:
-        projects = random.sample(projects, int(n))
+    if n_projects is not None:
+        projects = random.sample(projects, int(n_projects))
     for item in projects:
-        obj = { 'projectPath': item }
+        obj = {'projectPath': item}
         print(json.dumps(obj))
 
 def write_all_projects(dirpath):
-    projects = []
+    """Write out paths to all projects within the specified dirpath."""
     for item in os.listdir(dirpath):
-        obj = { 'projectPath': item }
+        obj = {'projectPath': item}
         print(json.dumps(obj))
 
 
 if __name__ == '__main__':
-    args = sys.argv[1:]
+    ARGS = sys.argv[1:]
 
-    if not args or any(x in args for x in ['-h', '--help']):
-        printhelp()
-    
+    if not ARGS or any(x in ARGS for x in ['-h', '--help']):
+        _printhelp()
+
     # grab a sample of successful projects?
-    successful = False
-    if '-s' in args:
-        successful = True
-        args.remove('-s')
+    SUCCESSFUL = False
+    if '-s' in ARGS:
+        SUCCESSFUL = True
+        ARGS.remove('-s')
 
-    infile = args[0]
-    if successful:
+    INFILE = ARGS[0]
+    if SUCCESSFUL:
         try:
-            n = args[1]
-            write_successful(infile, n)
+            N_PROJECTS = ARGS[1]
+            write_successful(INFILE, N_PROJECTS)
         except IndexError:
-            write_successful(infile, None)
+            write_successful(INFILE, None)
     else:
-        write_all_projects(infile)
+        write_all_projects(INFILE)
