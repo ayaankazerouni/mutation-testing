@@ -33,11 +33,9 @@
 
   <path id="pitest.plus.path">
     <pathelement location="${resource_dir}/junit-4.12.jar" />
-    <pathelement location="${plus_resources}/pitestPlus.jar" />
-    <pathelement location="${plus_resources}/pitest-ant.jar" />
-    <pathelement location="${plus_resources}/pitest-command-line.jar" />
-    <pathelement location="${plus_resources}/commons-codec-1.11.jar" />
-    <pathelement location="${plus_resources}/xstream-1.4.11.1.jar" />
+    <pathelement location="${plus_resources}/pitest-1.4.4-SNAPSHOT.jar" />
+    <pathelement location="${plus_resources}/pitest-ant-1.4.4-SNAPSHOT.jar" />
+    <pathelement location="${plus_resources}/pitest-entry-1.4.4-SNAPSHOT.jar" />
     <pathelement location="${resource_dir}/student.jar"/>
   </path>
 
