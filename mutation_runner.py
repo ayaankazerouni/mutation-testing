@@ -239,6 +239,7 @@ class MutationRunner:
 
         if self.all_mutators:
             pitreports = os.path.join(self.clonepath, 'pitReports')
+            mutators = ','.join(mutators)
             result = self.__mutate(mutators, pitreports)
             # look for the CSV file PIT creates
             coveragecsv = os.path.join(pitreports, 'mutations.csv')
