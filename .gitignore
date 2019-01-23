@@ -13,6 +13,7 @@ sandbox.py
 *-notebook.html
 .vscode
 tasks.json
+tasks.ndjson
 node_modules/
 data/
 

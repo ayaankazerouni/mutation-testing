@@ -82,7 +82,6 @@ def run(taskfile, all_mutators=True, pitplus=False):
 
 def __run_for_project(task, all_mutators, pitplus):
     opts = json.loads(task)
-    start = time.time()
     projectpath = opts['projectPath']
     logging.info('Starting for %s', projectpath)
     runner = MutationRunner(
@@ -91,15 +90,14 @@ def __run_for_project(task, all_mutators, pitplus):
         pitplus=pitplus
     )
     mutationoutput = runner.testsingleproject()
-    diff = time.time() - start
     if all_mutators:
         # mutationoutput is a tuple
-        coverage, result = mutationoutput
+        coverage, result, runningtime = mutationoutput
         if result.returncode == 0:
             output = {
                 'success': True,
                 'projectPath': opts['projectPath'],
-                'runningTime': diff,
+                'runningTime': runningtime,
                 'coverage': coverage
                 }
             print(json.dumps(output))
@@ -109,7 +107,7 @@ def __run_for_project(task, all_mutators, pitplus):
             output = {
                 'success': False,
                 'projectPath': opts['projectPath'],
-                'runningTime': diff
+                'runningTime': runningtime
                 }
             print(json.dumps(output))
             logging.error('%s: All operators', runner.projectname)
@@ -118,14 +116,14 @@ def __run_for_project(task, all_mutators, pitplus):
     else:
         # mutationoutput is a dict
         output = {
-            'projectPath': opts['projectPath'],
-            'runningTime': diff
+            'projectPath': opts['projectPath']
         }
         successes = []
         for key, value in mutationoutput.items():
-            coverage, result = value # this is a tuple
+            coverage, result, runningtime = value # this is a tuple
             if result.returncode == 0:
                 output[key] = coverage
+                output['{}_runningTime'.format(key)] = runningtime
                 logging.info('%s: %s', runner.projectname, key)
                 logging.info(result.stdout)
                 successes.append(True)
@@ -196,16 +194,16 @@ class MutationRunner:
         This function has file system side effects. Copies the project to /tmp/ and
         runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
 
-        The method returns a (float, CompletedSubprocess)  tuple if all
-        available mutators are used, or a dict of (float, CompletedSubprocess)
+        The method returns a (float, CompletedSubprocess, float)  tuple if all
+        available mutators are used, or a dict of (float, CompletedSubprocess, float)
         tuples if operators are applied one after the other, with each key being
-        the name of a mutant.
+        the name of a mutation operator.
 
         Returns:
-            (float, CompletedProcess): The coverage percentage and the completed
-                                       subprocess, or
-            (dict): The coverage percentages and completed subprocess for each
-                    mutation operator (if not self.all_mutators)
+            (float, CompletedProcess, float): A tuple containing the coverage percentage, the
+                                              completed subprocess, and the running time, or
+            (dict): The coverage percentages, completed subprocess, and running time
+                    for each mutation operator (if not self.all_mutators)
         """
         # Copy the project to /tmp/ to avoid modifying the original
         if os.path.exists(self.clonepath) and os.path.isdir(self.clonepath):
@@ -238,32 +236,36 @@ class MutationRunner:
             mutators = self.reduced_mutators + self.pit_mutators + self.extended_mutators
 
         if self.all_mutators:
+            start = time.time()
             pitreports = os.path.join(self.clonepath, 'pitReports')
             mutators = ','.join(mutators)
             result = self.__mutate(mutators, pitreports)
+            runningtime = time.time() - start
             # look for the CSV file PIT creates
             coveragecsv = os.path.join(pitreports, 'mutations.csv')
             coverage = aggregate_results.get_mutation_coverage(coveragecsv)
             if coverage is None:
-                return (None, result)
-            return (coverage['mutationCovered'], result)
+                return (None, result, runningtime)
+            return (coverage['mutationCovered'], result, runningtime)
 
         # use each mutation operator one-by-one
         results = {}
         for mutator in mutators:
+            start = time.time()
             pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
             result = self.__mutate(mutator, pitreports=pitreports)
+            runningtime = time.time() - start
             if result.returncode > 0:
                 logging.error('%s: Error running operator %s',
                               self.projectname, mutator)
-                results[mutator] = (None, result)
+                results[mutator] = (None, result, runningtime)
             else:
                 coveragecsv = os.path.join(pitreports, 'mutations.csv')
                 coverage = aggregate_results.get_mutation_coverage(coveragecsv)
                 if coverage is None:
-                    results[mutator] = (None, result)
+                    results[mutator] = (None, result, runningtime)
                 else:
-                    results[mutator] = (coverage['mutationCovered'], result)
+                    results[mutator] = (coverage['mutationCovered'], result, runningtime)
             logging.info('%s: Finished mutating with %s', self.projectname, mutator)
         return results
 
