@@ -271,9 +271,8 @@ class MutationRunner:
 
     def __mutate(self, mutators, pitreports):
         targetclasses, targettests = self.getpittargets()
-        pittask = 'pitPlus' if self.pitplus else 'pit'
         antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dtarget_classes={} '
-                  '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} {}') \
+                  '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} pit') \
                   .format(
                       self.antpath,
                       self.clonepath,
@@ -281,8 +280,7 @@ class MutationRunner:
                       targetclasses,
                       targettests,
                       mutators,
-                      pitreports,
-                      pittask
+                      pitreports
                   )
         logging.info('ANT command: %s', antcmd)
         result = subprocess.run(antcmd, shell=True, stdout=subprocess.PIPE,
