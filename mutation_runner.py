@@ -41,7 +41,7 @@ def main(args):
     taskfile = args.taskfile
     run(taskfile, args.steps, args.mutators)
 
-def run(taskfile, steps=False, mutators=False):
+def run(taskfile, steps=False, mutators='all'):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
@@ -75,7 +75,7 @@ def __run_for_project(task, steps, mutators):
                 'coverage': coverage
                 }
             print(json.dumps(output))
-            logging.info('%s: All operators', runner.projectname)
+            logging.info('%s: %s set', runner.projectname, mutators)
             logging.info(result.stdout)
         else:
             output = {
@@ -84,7 +84,7 @@ def __run_for_project(task, steps, mutators):
                 'runningTime': runningtime
                 }
             print(json.dumps(output))
-            logging.error('%s: All operators', runner.projectname)
+            logging.error('%s: %s set', runner.projectname, mutators)
             logging.error(result.stdout)
             logging.error(result.stderr)
     else:
