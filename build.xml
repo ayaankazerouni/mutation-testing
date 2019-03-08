@@ -3,7 +3,7 @@
   <property name="report_dir" value="${basedir}/reports/"/>
   <property name="bin_dir" value="${basedir}/bin/"/>
   <property name="pit_reports" value="${basedir}/pitReports" />
-  <property name="plus_resources" value="${resource_dir}/pitestPlus" />
+
   <!-- timeout is in milliseconds -->
   <property name="exec.timeout" value="120000"/>
   <property name="build.compiler" value="modern"/>
@@ -106,7 +106,6 @@
   <!-- run PIT mutation testing -->
   <target name="pit" depends="compile">
     <pitest pitClasspath="pitest.path"
-      threads="2"
       classPath="mutation.classpath"
       targetTests="${target_tests}"
       targetClasses="${target_classes}"
