@@ -12,8 +12,7 @@ sandbox.py
 
 *-notebook.html
 .vscode
-tasks.json
-tasks.ndjson
+*.ndjson
 node_modules/
 data/
 

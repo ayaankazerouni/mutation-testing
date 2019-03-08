@@ -17,10 +17,9 @@ Mutation testing dependencies:
  - (on macOS) brew install gsed
 
 Usage:
- - Part of a batch job, using ./run-all (see ./run-all --help)
  - Run as a CLI tool on one or more projects using a task file.
-   Usage: see ./run_mutation_test --help
- - import run_mutation_test
+   Usage: see ./mutation_runner.py --help
+ - import mutation_runner 
 """
 
 import os
@@ -29,68 +28,43 @@ import json
 import time
 import subprocess
 import logging
+import argparse
 from shutil import rmtree, copytree
 
 import aggregate_results
 
 def main(args):
     """Entry point. Respond to CLI args and trigger execution."""
-    if any(x in args for x in ['-h', '--help']):
-        printhelp()
+    loglevel = args.log
+    logging.basicConfig(filename='.log', filemode='w', level=loglevel)
 
-    loglevel = logging.WARN
-    if any(x in args for x in ['-l', '--log']):
-        loglevel = logging.INFO
-    logging.basicConfig(filename='mutation.log', filemode='w', level=loglevel)
+    taskfile = args.taskfile
+    run(taskfile, args.steps, args.mutators)
 
-    all_mutators = True
-    if any(x in args for x in ['-s', '--steps']):
-        all_mutators = False
-
-    pitplus = any(x in args for x in ['-p', '--pitplus'])
-
-    taskfile = args[0]
-    run(taskfile, all_mutators, pitplus)
-
-def printhelp():
-    """Print usage info."""
-    usage = '''
-    Run mutation analysis on projects from a taskFile.
-    Usage: ./run-mutation-test taskFile [-l] [-h]
-
-    taskFile\t NDJSON file containing tasks with the keys:
-    \t\t{ projectPath (required) }
-    -l|--log\t Print stdout and stderr?
-    -h|--help\t Print this help (ignoring any other params)
-    -s|--steps\t Run testing in steps, one mutator at a time
-    '''
-    print(usage)
-    sys.exit(1)
-
-def run(taskfile, all_mutators=True, pitplus=False):
+def run(taskfile, steps=False, mutators=False):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
     Args:
         taskfile (str): Path to an NDJSON file containing filepaths
-        all_mutators (bool): Run with all mutators, or each one in steps?
-        pitplus (bool): Include the extended mutators?
+        step (bool): Run mutators one-by-one, or all at once? 
+        mutators (bool): Set of mutators to use (see --help)
     """
     with open(taskfile) as infile:
         for line in infile:
-            __run_for_project(line, all_mutators, pitplus)
+            __run_for_project(line, steps, mutators)
 
-def __run_for_project(task, all_mutators, pitplus):
+def __run_for_project(task, steps, mutators):
     opts = json.loads(task)
     projectpath = opts['projectPath']
     logging.info('Starting for %s', projectpath)
     runner = MutationRunner(
         projectpath=projectpath,
-        all_mutators=all_mutators,
-        pitplus=pitplus
+        steps=steps,
+        mutators=mutators
     )
     mutationoutput = runner.testsingleproject()
-    if all_mutators:
+    if not steps:
         # mutationoutput is a tuple
         coverage, result, runningtime = mutationoutput
         if result.returncode == 0:
@@ -139,12 +113,13 @@ class MutationRunner:
     """Runs mutation testing on a specified project.
 
     Class Attributes:
-        reduced_mutators (list): Reduced set of PIT mutators, based on Offut et al.
-        pit_mutators (list): Other mutators available in PIT, used by Laurent et al.
-        extended_mutators (list): Extended mutators proposed by Laurent et al.
+        deletion_mutators (list): Approximation of Offut's deletion set using PIT operators. 
+        default_mutators (list): PIT's old default group ("STRONGER" group in v1.4.6)
+        all_mutators (list): All PIT mutators used by Laurent et al. in their evaluation.
+                             This list subsumes the deletion_mutators list. 
     """
     # class attributes
-    reduced_mutators = [
+    deletion_mutators = [
         'REMOVE_CONDITIONALS',
         'VOID_METHOD_CALLS',
         'NON_VOID_METHOD_CALLS',
@@ -155,7 +130,17 @@ class MutationRunner:
         'EMPTY_RETURNS'
     ]
 
-    pit_mutators = [
+    default_mutators = [
+        'CONDITIONALS_BOUNDARY',
+        'INCREMENTS',
+        'INVERT_NEGS',
+        'MATH',
+        'NEGATE_CONDITIONALS',
+        'RETURN_VALS',
+        'VOID_METHOD_CALLS'
+    ]
+
+    all_mutators = deletion_mutators + [
         'CONDITIONALS_BOUNDARY',
         'NEGATE_CONDITIONALS',
         'MATH',
@@ -164,11 +149,8 @@ class MutationRunner:
         'INLINE_CONSTS',
         'RETURN_VALS',
         'EXPERIMENTAL_MEMBER_VARIABLE',
-        'EXPERIMENTAL_SWITCH'
-    ]
-
-    extended_mutators = [
-        'EXPERIMENTAL_ABS',
+        'EXPERIMENTAL_SWITCH',
+        'ABS',
         'AOD',
         'AOR',
         'CRCR',
@@ -178,12 +160,20 @@ class MutationRunner:
     ]
 
     def __init__(self, projectpath, antpath=None, libpath=None,
-                 all_mutators=True, pitplus=False):
+                 steps=False, mutators='all'):
         self.projectpath = os.path.normpath(os.path.expanduser(projectpath))
         self.projectname = os.path.basename(self.projectpath)
         self.clonepath = os.path.join('/tmp/mutation-testing', self.projectname, '')
-        self.all_mutators = all_mutators
-        self.pitplus = pitplus
+        self.steps = steps 
+        if mutators == 'all':
+            self.mutators = self.all_mutators
+        elif mutators == 'deletion':
+            self.mutators = self.deletion_mutators
+        elif mutators == 'default':
+            self.mutators = self.default_mutators
+        else:
+            raise ValueError('Mutators must be "all", "deletion", or "default"')
+
         cwd = os.getcwd()
         self.antpath = antpath or os.path.join(cwd, 'build.xml')
         self.libpath = libpath or os.path.join(cwd, 'lib')
@@ -203,7 +193,7 @@ class MutationRunner:
             (float, CompletedProcess, float): A tuple containing the coverage percentage, the
                                               completed subprocess, and the running time, or
             (dict): The coverage percentages, completed subprocess, and running time
-                    for each mutation operator (if not self.all_mutators)
+                    for each mutation operator (if self.steps)
         """
         # Copy the project to /tmp/ to avoid modifying the original
         if os.path.exists(self.clonepath) and os.path.isdir(self.clonepath):
@@ -231,14 +221,10 @@ class MutationRunner:
                                'To install: brew install gsed'))
             sys.exit(0)
 
-        mutators = self.reduced_mutators
-        if self.pitplus:
-            mutators = self.reduced_mutators + self.pit_mutators + self.extended_mutators
-
-        if self.all_mutators:
+        if not self.steps:
             start = time.time()
             pitreports = os.path.join(self.clonepath, 'pitReports')
-            mutators = ','.join(mutators)
+            mutators = ','.join(self.mutators)
             result = self.__mutate(mutators, pitreports)
             runningtime = time.time() - start
             # look for the CSV file PIT creates
@@ -250,7 +236,7 @@ class MutationRunner:
 
         # use each mutation operator one-by-one
         results = {}
-        for mutator in mutators:
+        for mutator in self.mutators:
             start = time.time()
             pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
             result = self.__mutate(mutator, pitreports=pitreports)
@@ -308,9 +294,24 @@ class MutationRunner:
 
         return (targetclasses, targettests)
 
+def _check_mutators(val):
+    valid = ['all', 'default', 'deletion']
+    if val not in valid:
+        raise argparse.ArgumentTypeError('{} is not in the valid list of mutator sets {}'.format(val, valid))
+
+    return val
+    
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run mutation analysis on projects from a taskFile.')
+    parser.add_argument('taskfile', help='Path to an NDJSON file containing project tasks.\nEach task\
+            should have the key "projectPath", pointing to a project target for mutation.')
+    parser.add_argument('-l', '--log', action='store_const', const=logging.INFO, default=logging.WARN,
+                        help='if given, sets log level to INFO')
+    parser.add_argument('-s', '--steps', action='store_true', help='run each mutator one-by-one?')
+    parser.add_argument('-m', '--mutators', default='all', type=_check_mutators, help='set of mutators to run (all|default|deletion)')
     if sys.argv[1:]:
-        main(sys.argv[1:])
+        args = parser.parse_args()
+        main(args)
     else:
         print('Error! No args')
-        printhelp()
+        parser.print_help()

@@ -25,9 +25,9 @@
   <!-- classpath for pitest and its dependencies (including test libraries)-->
   <path id="pitest.path">
     <pathelement location="${resource_dir}/junit-4.12.jar" />
-    <pathelement location="${resource_dir}/pitest-1.4.5.jar" />
-    <pathelement location="${resource_dir}/pitest-entry-1.4.5.jar" />
-    <pathelement location="${resource_dir}/pitest-ant-1.4.5.jar" />
+    <pathelement location="${resource_dir}/pitest-1.4.6.jar" />
+    <pathelement location="${resource_dir}/pitest-entry-1.4.6.jar" />
+    <pathelement location="${resource_dir}/pitest-ant-1.4.6.jar" />
     <pathelement location="${resource_dir}/student.jar"/>
   </path>
 
