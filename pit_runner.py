@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 """
 Author: Ayaan Kazerouni <ayaan@vt.edu>
-Description: Run mutation analysis on projects from a taskFile.
+Description: Run mutation analysis using PIT on projects from a taskFile.
 
 Overview:
  - Copy project to /tmp/
@@ -18,7 +18,7 @@ Mutation testing dependencies:
 
 Usage:
  - Run as a CLI tool on one or more projects using a task file.
-   Usage: see ./mutation_runner.py --help
+   Usage: see ./pit_runner.py --help
  - import mutation_runner 
 """
 
