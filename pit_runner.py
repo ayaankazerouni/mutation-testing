@@ -31,7 +31,7 @@ import logging
 import argparse
 from shutil import rmtree, copytree
 
-import aggregate_results
+import utils
 
 def main(args):
     """Entry point. Respond to CLI args and trigger execution."""
@@ -181,12 +181,9 @@ class MutationRunner:
     def testsingleproject(self):
         """Run mutation testing on a single project.
 
-        This function has file system side effects. Copies the project to /tmp/ and
-        runs mutation testing using PIT. PIT results are in /tmp/{projectpath}/pitReports.
-
-        The method returns a (float, CompletedSubprocess, float)  tuple if all
-        available mutators are used, or a dict of (float, CompletedSubprocess, float)
-        tuples if operators are applied one after the other, with each key being
+        Returns a (float, CompletedSubprocess, float)  tuple if all
+        supplied mutators are used, or a dict of (float, CompletedSubprocess, float)
+        tuples if mutators are applied one after the other, with each key being
         the name of a mutation operator.
 
         Returns:
@@ -195,31 +192,7 @@ class MutationRunner:
             (dict): The coverage percentages, completed subprocess, and running time
                     for each mutation operator (if self.steps)
         """
-        # Copy the project to /tmp/ to avoid modifying the original
-        if os.path.exists(self.clonepath) and os.path.isdir(self.clonepath):
-            rmtree(self.clonepath)
-        copytree(self.projectpath, self.clonepath)
-
-        # Create com.example package structure
-        pkg = os.path.join(self.clonepath, 'src', 'com', 'example', '')
-        os.makedirs(pkg)
-
-        # Move Java files directly under src into src/com/example
-        mvcmd = 'mv {javafiles} {package}' \
-                .format(javafiles=os.path.join(self.clonepath, 'src', '*.java'), package=pkg)
-        subprocess.run(mvcmd, shell=True).check_returncode()
-
-        # Add package declaration to the top of Java files
-        sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
-        sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
-                .format(javafiles=os.path.join(pkg, '*.java'))
-        try:
-            subprocess.run(sedcmd, shell=True).check_returncode()
-        except subprocess.CalledProcessError as err:
-            if err.returncode == 127 and sys.platform == 'darwin':
-                logging.error(('If you are on macOS, please install the GNU sed extension "gsed". '
-                               'To install: brew install gsed'))
-            sys.exit(0)
+        utils.clone_with_package_structure(self.projectpath, self.clonepath)
 
         if not self.steps:
             start = time.time()
@@ -229,7 +202,7 @@ class MutationRunner:
             runningtime = time.time() - start
             # look for the CSV file PIT creates
             coveragecsv = os.path.join(pitreports, 'mutations.csv')
-            coverage = aggregate_results.get_mutation_coverage(coveragecsv)
+            coverage = utils.get_mutation_coverage(coveragecsv)
             if coverage is None:
                 return (None, result, runningtime)
             return (coverage['mutationCovered'], result, runningtime)
@@ -247,7 +220,7 @@ class MutationRunner:
                 results[mutator] = (None, result, runningtime)
             else:
                 coveragecsv = os.path.join(pitreports, 'mutations.csv')
-                coverage = aggregate_results.get_mutation_coverage(coveragecsv)
+                coverage = utils.get_mutation_coverage(coveragecsv)
                 if coverage is None:
                     results[mutator] = (None, result, runningtime)
                 else:
@@ -297,18 +270,26 @@ class MutationRunner:
 def _check_mutators(val):
     valid = ['all', 'default', 'deletion']
     if val not in valid:
-        raise argparse.ArgumentTypeError('{} is not in the valid list of mutator sets {}'.format(val, valid))
+        raise argparse.ArgumentTypeError(
+                '{} is not in the valid list of mutator sets {}'.format(val, valid)
+        )
 
     return val
     
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run mutation analysis on projects from a taskFile.')
-    parser.add_argument('taskfile', help='Path to an NDJSON file containing project tasks.\nEach task\
-            should have the key "projectPath", pointing to a project target for mutation.')
-    parser.add_argument('-l', '--log', action='store_const', const=logging.INFO, default=logging.WARN,
-                        help='if given, sets log level to INFO')
-    parser.add_argument('-s', '--steps', action='store_true', help='run each mutator one-by-one?')
-    parser.add_argument('-m', '--mutators', default='all', type=_check_mutators, help='set of mutators to run (all|default|deletion)')
+    parser = argparse.ArgumentParser(
+            description='Run mutation analysis on projects from a taskFile.'
+        )
+    parser.add_argument('taskfile', 
+                        help='Path to an NDJSON file containing project tasks.\n\
+                                Each task should have the key "projectPath", pointing \
+                                to a project target for mutation.')
+    parser.add_argument('-l', '--log', action='store_const', const=logging.INFO, 
+                        default=logging.WARN, help='if given, sets log level to INFO')
+    parser.add_argument('-s', '--steps', action='store_true', 
+                        help='run each mutator one-by-one?')
+    parser.add_argument('-m', '--mutators', default='all', type=_check_mutators, 
+                        help='set of mutators to run (all|default|deletion)')
     if sys.argv[1:]:
         args = parser.parse_args()
         main(args)
