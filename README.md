@@ -18,7 +18,7 @@ Also grab a jar of JUnit from [maven](https://mvnrepository.com/artifact/junit/j
 
 Usage: `./pit_runner.py --help`
 
-[pit_runner.py](pit_runner.py) runs PIT with three possible sets of operators:
+[pit/pit_runner.py](pit/pit_runner.py) runs PIT with three possible sets of operators:
 * `default` set (according to PIT website)
 * our approximation of Offut's `deletion` set 
 * `all` PIT operators evaluated in Laurent et al.'s 2017 paper
