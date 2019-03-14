@@ -1,0 +1,44 @@
+<project name="mutation-testing" default="compile">
+
+  <property name="report_dir" value="${basedir}/reports/"/>
+  <property name="bin_dir" value="${basedir}/classes/"/>
+
+  <!-- timeout is in milliseconds -->
+  <property name="exec.timeout" value="120000"/>
+  <property name="build.compiler" value="modern"/>
+
+  <echo message="resource_dir = ${resource_dir}" />
+
+  <!-- classpath for running the tests (project files and test libraries) -->
+  <path id="mutation.classpath">
+    <pathelement location="${resource_dir}/JavaTddPluginSupport.jar" />
+    <pathelement location="${resource_dir}/junit-4.12.jar" />
+    <pathelement location="${resource_dir}/student.jar" />
+    <pathelement location="${bin_dir}"/>
+  </path>
+
+  <!-- delete output from previous runs -->
+  <target name="clean">
+    <delete dir="${bin_dir}" />
+    <delete dir="${report_dir}" />
+  </target>
+
+  <!-- compile project files -->
+  <target name="compile" depends="clean">
+    <mkdir dir="${report_dir}"/>
+    <mkdir dir="${bin_dir}"/>
+    <record name="${report_dir}/compile.log" action="start"/>
+    <javac
+      srcdir="src/"
+      destdir="${bin_dir}"
+      debug="true"
+      debuglevel="lines,vars,source"
+      includeAntRuntime="false">
+      <classpath refid="mutation.classpath"/>
+      <compilerarg value="-Xlint:unchecked"/>
+      <compilerarg value="-Xlint:empty"/>
+      <compilerarg value="-Xlint:fallthrough"/>
+    </javac>
+    <record name="${report_dir}/compile.log" action="stop"/>
+  </target>
+</project>
