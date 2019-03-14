@@ -29,5 +29,5 @@ Since muJava runs on Java 8, we use Docker to generate and test these mutants.
 Within the [mujava](mujava/) directory, issue the following command:
 * `$ ./setup.sh`
 
-This will download the various jars required by muJava. Other dependecies are taken care of in the [Dockerfile](Dockerfile).
+This will download the various jars required by muJava. Other dependecies are taken care of in the [Dockerfile](mujava/Dockerfile).
 
