@@ -12,7 +12,7 @@ Inside the [pit](pit/) directory, issue the following:
 * `$ ./setup.sh`
 
 This will download various jars required by PIT. Other dependencies:
-* sudo apt install ant
+* `sudo apt install ant` or `brew install ant`
 * (on macOS) brew install sed
 
 Usage: `./pit_runner.py --help`
