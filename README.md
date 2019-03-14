@@ -5,16 +5,15 @@ Enable automated mutation testing using the following:
 - [ ] muJava
 
 ## Overview
-### PIT
+### [PIT](https://pitest.org)
 
 **Dependencies**
-From the [releases page](https://github.com/hcoles/pitest) of PIT, grab the latest versions of the following jars:
-* pitest
-* pitest-entry
-* pitest-ant
+Inside the [pit](pit/) directory, issue the following:
+* `$ ./setup.sh`
 
-Also grab a jar of JUnit from [maven](https://mvnrepository.com/artifact/junit/junit/4.12):
-* junit
+This will download various jars required by PIT. Other dependencies:
+* sudo apt install ant
+* (on macOS) brew install sed
 
 Usage: `./pit_runner.py --help`
 
@@ -23,6 +22,12 @@ Usage: `./pit_runner.py --help`
 * our approximation of Offut's `deletion` set 
 * `all` PIT operators evaluated in Laurent et al.'s 2017 paper
 
-### muJava
+### [muJava](https://cs.gmu.edu/~offutt/mujava/)
+Since muJava runs on Java 8, we use Docker to generate and test these mutants.
 
-TODO
+**Dependencies**
+Within the [mujava](mujava/) directory, issue the following command:
+* `$ ./setup.sh`
+
+This will download the various jars required by muJava. Other dependecies are taken care of in the [Dockerfile](Dockerfile).
+
