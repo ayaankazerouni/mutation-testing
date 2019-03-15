@@ -11,9 +11,8 @@
 
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
-    <pathelement location="${resource_dir}/JavaTddPluginSupport.jar" />
-    <pathelement location="${resource_dir}/junit-4.12.jar" />
     <pathelement location="${resource_dir}/student.jar" />
+    <pathelement location="${resource_dir}/junit.jar" />
     <pathelement location="${bin_dir}"/>
   </path>
 

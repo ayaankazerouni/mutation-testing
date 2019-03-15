@@ -61,34 +61,37 @@ def aggregate_mutation_results(dirpath):
     mutationcoverage.index.name = 'userName'
     return mutationcoverage
 
-def clone_with_package_structure(projectpath, clonepath):
-    """Copy the project at projectpath to the specified
-    clonepath, to avoid modifying the source data. Also create
-    an artificial package structure (i.e., com.example) to appease
-    PIT.
+def clone_project(projectpath, clonepath, package=True):
+    """Copy the project at projectpath to the specified clonepath.
+
+    Args:
+        projectpath (str): Original path to the initial project
+        clonepath (str): Path to be cloned to
+        package (bool): Should com.example.* package structure be created? 
     """
     # Copy the project to /tmp/ to avoid modifying the original
     if os.path.exists(clonepath) and os.path.isdir(clonepath):
         rmtree(clonepath)
     copytree(projectpath, clonepath)
+    
+    if package:
+        # Create com.example package structure
+        pkg = os.path.join(clonepath, 'src', 'com', 'example', '')
+        os.makedirs(pkg)
 
-    # Create com.example package structure
-    pkg = os.path.join(clonepath, 'src', 'com', 'example', '')
-    os.makedirs(pkg)
+        # Move Java files directly under src into src/com/example
+        mvcmd = 'mv {javafiles} {package}' \
+                .format(javafiles=os.path.join(clonepath, 'src', '*.java'), package=pkg)
+        subprocess.run(mvcmd, shell=True).check_returncode()
 
-    # Move Java files directly under src into src/com/example
-    mvcmd = 'mv {javafiles} {package}' \
-            .format(javafiles=os.path.join(clonepath, 'src', '*.java'), package=pkg)
-    subprocess.run(mvcmd, shell=True).check_returncode()
-
-    # Add package declaration to the top of Java files
-    sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
-    sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
-            .format(javafiles=os.path.join(pkg, '*.java'))
-    try:
-        subprocess.run(sedcmd, shell=True).check_returncode()
-    except subprocess.CalledProcessError as err:
-        if err.returncode == 127 and sys.platform == 'darwin':
-            logging.error(('If you are on macOS, please install the GNU '
-                           'sed extension "gsed". To install: brew install gsed'))
-        sys.exit(0)
+        # Add package declaration to the top of Java files
+        sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
+        sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
+                .format(javafiles=os.path.join(pkg, '*.java'))
+        try:
+            subprocess.run(sedcmd, shell=True).check_returncode()
+        except subprocess.CalledProcessError as err:
+            if err.returncode == 127 and sys.platform == 'darwin':
+                logging.error(('If you are on macOS, please install the GNU '
+                               'sed extension "gsed". To install: brew install gsed'))
+            sys.exit(0)
