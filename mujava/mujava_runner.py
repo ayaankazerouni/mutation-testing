@@ -1,5 +1,6 @@
 import os
 import sys
+import shutil
 import subprocess
 
 class MutationRunner:
@@ -28,6 +29,8 @@ class MutationRunner:
         cwd = os.getcwd()
         self.antpath = os.path.join(cwd, 'build.xml')
         self.libpath = os.path.join(cwd, 'lib')
+        self.mujava_classpath = '{libdir}/mujava.jar:{libdir}/openjava.jar:{libdir}/commons-io.jar:{libdir}/junit.jar:$JAVA_HOME/lib/tools.jar'\
+                                .format(libdir=self.libpath)
     
     def run(self):
         # projects were cloned already; assume they exist at self.clonepath
@@ -37,36 +40,55 @@ class MutationRunner:
             f.write('MuJava_HOME={}'.format(os.path.normpath(self.clonepath)))
         
         self.compileproject()
-        self.genmutes('session') 
-
+        sessionname = 'session'
+        self.testsession(sessionname)
+        self.genmutes(sessionname) 
 
     def compileproject(self):
         antcmd = 'ant -f {} -Dresource_dir={} -Dbasedir={} clean compile' \
                     .format(self.antpath, self.libpath, self.clonepath) 
         subprocess.run(antcmd, shell=True)
 
-    def genmutes(self, sessionname):
-        srcdir = os.path.join(self.clonepath, 'src')
-        srcfiles = ' '.join(filter(isjavasource, os.listdir(srcdir)))
+    def testsession(self, sessionname):
+        # make session directory structure
+        sesh_srcpath = os.path.join(self.clonepath, sessionname, 'src')
+        sesh_clspath = os.path.join(self.clonepath, sessionname, 'classes')
+        sesh_tstpath = os.path.join(self.clonepath, sessionname, 'testset')
+        sesh_resultpath = os.path.join(self.clonepath, sessionname, 'result')
+        os.makedirs(sesh_srcpath)
+        os.makedirs(sesh_clspath)
+        os.makedirs(sesh_tstpath)
+        os.makedirs(sesh_resultpath)
 
-        sessioncmd = 'java mujava.cli.testnew {} {}'.format(sessionname, srcfiles)
-        subprocess.run(sessioncmd, cwd=self.clonepath, shell=True)
+        # mv src and class files into place
+        srcfiles = self.srcfiles()
+        for filepath in srcfiles:
+            filename = os.path.basename(filepath)
+            shutil.copy(filepath, os.path.join(sesh_srcpath, filename))
 
-        # mv class files into place
         classpath = os.path.join(self.clonepath, 'classes')
         mvtestcmd = 'mv {}/*Test.class {}/testset/'.format(classpath, sessionname)
         mvsrccmd = 'mv {}/* {}/classes/'.format(classpath, sessionname)
         subprocess.run(mvtestcmd, cwd=self.clonepath, shell=True)
         subprocess.run(mvsrccmd, cwd=self.clonepath, shell=True)
 
-        genmutescmd = 'java mujava.cli.genmutes -ror {}'.format(sessionname)
-        result = subprocess.run(genmutescmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                                cwd=self.clonepath, shell=True)
+    def genmutes(self, sessionname):
+        # generate mutants
+        genmutescmd = 'java -cp {} mujava.cli.genmutes -all {}'\
+                      .format(self.mujava_classpath, sessionname)
+        print('Generating mutants: {}'.format(genmutescmd))
+        subprocess.run(genmutescmd, cwd=self.clonepath, shell=True)
 
-def isjavasource(filename):
-    name, ext = os.path.splitext(filename)
-    return not name.endswith('Test') and ext == '.java'
-
+    def srcfiles(self):
+       src = os.path.join(self.clonepath, 'src')
+       srcfiles = []
+       for root, _, files in os.walk(src):
+           for filename in files:
+               name, ext = os.path.splitext(filename)
+               if ext == '.java' and not name.endswith('Test'):
+                   srcfiles.append(os.path.join(root, filename))
+       return srcfiles
+            
 if __name__ == '__main__':
     outerdir = os.path.normpath('/tmp/mujava-testing')
     for project in os.listdir(outerdir):

@@ -1,4 +1,4 @@
-FROM openjdk:8
+FROM openjdk:8-slim
 
 # variables
 ARG BASEDIR="/usr/src/app"
@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
   ant \
   python3 \
   && rm -rf /var/lib/apt/lists/*;
-ENV CLASSPATH ${LIBDIR}/mujava.jar:${LIBDIR}/openjava.jar:${LIBDIR}/commons-io.jar:${LIBDIR}/junit.jar:${LIBDIR}/tools.jar
 
 VOLUME ${PROJDIR}
 
