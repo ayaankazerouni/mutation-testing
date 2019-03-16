@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import os
 import sys
 import shutil
@@ -11,10 +13,9 @@ class MutationRunner:
         all_mutators (list): All mutation operators provided by muJava.
     """
     # class attributes
-    #TODO: Populate this list entirely
     deletion_mutator = 'SDL'
-    all_mutators = [ 'ROR' ]
-
+    all_mutators = 'ALL'
+    
     def __init__(self, projectpath, mutators='all'):
         self.projectpath = os.path.normpath(projectpath)
         self.projectname = os.path.basename(self.projectpath)
@@ -74,7 +75,7 @@ class MutationRunner:
 
     def genmutes(self, sessionname):
         # generate mutants
-        genmutescmd = 'java -cp {} mujava.cli.genmutes -all {}'\
+        genmutescmd = 'java -cp {} mujava.cli.genmutes -sdl {}'\
                       .format(self.mujava_classpath, sessionname)
         print('Generating mutants: {}'.format(genmutescmd))
         subprocess.run(genmutescmd, cwd=self.clonepath, shell=True)
