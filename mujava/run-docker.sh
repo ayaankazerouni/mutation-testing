@@ -10,7 +10,7 @@ else
   taskfile='tasks.ndjson'
 fi
 
-rm -r ${projdir}
+sudo rm -rf ${projdir}
 
 ./clone-projects.py ${taskfile} && \
   docker build -t mujava-app . && \
