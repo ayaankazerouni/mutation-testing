@@ -1,5 +1,4 @@
 */projects/*
-lib/
 *.ipynb
 .ipynb_checkpoints
 __pycache__/
