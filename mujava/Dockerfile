@@ -13,8 +13,7 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*;
 
 VOLUME ${PROJDIR}
-
-COPY . ${BASEDIR}
+VOLUME ${BASEDIR}
 
 # CMD [ "python3", "mujava_runner.py" ]
 CMD ["bash"]

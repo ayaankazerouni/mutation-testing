@@ -1,6 +1,7 @@
 <project name="mutation-testing" default="compile">
 
-  <property name="report_dir" value="${basedir}/reports/"/>
+  <property name="junit_reports" value="${basedir}/junitReports" />
+  <property name="report_dir" value="${basedir}/reports" />
   <property name="bin_dir" value="${basedir}/classes/"/>
 
   <!-- timeout is in milliseconds -->
@@ -8,20 +9,31 @@
   <property name="build.compiler" value="modern"/>
 
   <echo message="resource_dir = ${resource_dir}" />
+  <echo message="mutant_dir = ${mutant_dir}" />
+  <echo message="mutant_class = ${mutant_class}" />
 
-  <!-- classpath for running the tests (project files and test libraries) -->
+  <!-- classpath for building the project and test files -->
   <path id="mutation.classpath">
     <pathelement location="${resource_dir}/student.jar" />
+  </path>
+  
+  <!-- classpath for running mutants -->
+  <path id="runmutes.classpath">
+    <path refid="mutation.classpath" />
+    <path location="${resource_dir}/JavaTddPluginSupport.jar" /> 
+    <pathelement location="${bin_dir}" /> <!-- original class files -->
   </path>
 
   <!-- delete output from previous runs -->
   <target name="clean">
     <delete dir="${bin_dir}" />
     <delete dir="${report_dir}" />
+    <delete dir="${junit_reports}" />
   </target>
 
   <!-- compile project files -->
   <target name="compile" depends="clean">
+    <mkdir dir="${junit_reports}"/>
     <mkdir dir="${report_dir}"/>
     <mkdir dir="${bin_dir}"/>
     <record name="${report_dir}/compile.log" action="start"/>
@@ -37,5 +49,50 @@
       <compilerarg value="-Xlint:fallthrough"/>
     </javac>
     <record name="${report_dir}/compile.log" action="stop"/>
+  </target>
+
+  <!-- run the unit tests on a mutant and write results to csv --> 
+  <!-- assume that all the class files needed already exist -->
+  <target name="run">
+    <junit
+      fork="true"
+      forkmode="once"
+      printsummary="off"
+      haltonerror="no"
+      haltonfailure="no"
+      filtertrace="no"
+      timeout="${exec.timeout}"
+      tempdir="./" >
+      <classpath>
+        <path refid="runmutes.classpath" />
+        <dirset dir="${mutant_dir}" >
+          <include name="${mutant_class}" />
+        </dirset>
+      </classpath>
+      <jvmarg value="-ea"/>
+      <sysproperty key="student.TestCase.trimStackTraces" value="true"/>
+      <sysproperty key="java.security.policy" value="=file:${resource_dir}/java.policy"/>
+      <sysproperty key="junit_reports" value="${junit_reports}"/>
+      <sysproperty key="resource_dir" value="${resource_dir}"/>
+      <sysproperty key="ant.home" value="${ant.home}"/>
+      <sysproperty key="student.TestCase.trimStackTraces" value="false"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.ceiling" value="3000"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.maximum" value="4000"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.logfile" value="${junit_reports}/timeout.csv"/>
+      <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.user" value="${user.dir}"/>
+      <sysproperty key="net.sf.webcat.plugins.javatddplugin.CsvJUnitResultFormatter.prefix" value="${user.dir}"/>
+      <formatter
+        classname="net.sf.webcat.plugins.javatddplugin.CsvJUnitResultFormatter"
+        extension=".csv" />
+      <batchtest todir="${junit_reports}">
+        <fileset dir="${bin_dir}">
+          <include name="**/*Test.class" />
+          <exclude name="reports/"/>
+        </fileset>
+      </batchtest>
+    </junit>
+    <concat destfile="${junit_reports}/results.csv">
+      <fileset dir="${junit_reports}" includes="*.csv" excludes="results.csv"/>
+    </concat>
   </target>
 </project>
