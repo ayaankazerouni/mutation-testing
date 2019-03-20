@@ -60,6 +60,7 @@ class MutationRunner:
         """Compile the project using ANT."""
         antcmd = 'ant -f {} -Dresource_dir={} -Dbasedir={} clean compile' \
                     .format(self.antpath, self.libpath, self.clonepath) 
+        logging.info('Compiling: {}'.format(antcmd)) 
         result = subprocess.run(antcmd, shell=True, stderr=subprocess.PIPE, 
                                 stdout=subprocess.PIPE)
         if result.returncode == 0:
@@ -84,6 +85,7 @@ class MutationRunner:
 
         # make session directory structure
         sesh_path = os.path.join(self.clonepath, self.sessionname)
+        logging.info('Creating test session at {}'.format(sesh_path))
         if os.path.exists(sesh_path):
             shutil.rmtree(sesh_path)
 
@@ -124,6 +126,7 @@ class MutationRunner:
         start = time.time()
         genmutescmd = 'java -cp {} mujava.cli.genmutes {} {}'\
                       .format(self.mujava_classpath, mutators, self.sessionname)
+        logging.info('Generating mutants: {}'.format(genmutescmd))
         result = subprocess.run(genmutescmd, cwd=self.clonepath, shell=True,
                                 stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         runningtime = time.time() - start
