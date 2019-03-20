@@ -60,9 +60,9 @@ class MutationRunner:
         """Compile the project using ANT."""
         antcmd = 'ant -f {} -Dresource_dir={} -Dbasedir={} clean compile' \
                     .format(self.antpath, self.libpath, self.clonepath) 
-        logging.info('Compiling: {}'.format(antcmd)) 
-        result = subprocess.run(antcmd, shell=True, stderr=subprocess.PIPE, 
-                                stdout=subprocess.PIPE)
+        logging.info('Compiling: {}'.format(antcmd))
+        result = subprocess.run(antcmd, shell=True, cwd=self.clonepath,
+                                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         if result.returncode == 0:
             logging.info(result.stdout)
         else:
@@ -143,22 +143,27 @@ class MutationRunner:
 
         # find mutated class files 
         mutated = self.__mutant_classes()
+        total = len(mutated)
         count = 0
         for mutantdir, mutantclass in mutated:
-            if count < 10:
-                self.__runmutant(mutantdir, mutantclass)
-                count = count + 1
-            else:
-                break
+            self.__runmutant(mutantdir, mutantclass)
+            count = count + 1
+            print('Ran {:.2%}'.format(count / total))
 
     def __runmutant(self, mutantdir, mutantclass):
         mutantdir = "'{}'".format(mutantdir)
-        antcmd = (
-                    'ant -f {} -Dbasedir={} -Dresource_dir={} -Dmutant_class={} '
-                    '-Dmutant_dir={} run'
-                 ).format(self.antpath, self.clonepath, self.libpath, \
-                          mutantclass, mutantdir)
-        subprocess.run(antcmd, shell=True)
+        antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dmutant_class={} '
+                  '-Dmutant_dir={} run') \
+                 .format(self.antpath, self.clonepath, self.libpath,
+                         mutantclass, mutantdir)
+        logging.info('Running mutant: {}'.format(antcmd))
+        result = subprocess.run(antcmd, cwd=self.clonepath, shell=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode == 0:
+            logging.info(result.stdout)
+        else:
+            logging.error(result.stdout)
+            logging.error(result.stderr)
 
     def __mutant_classes(self):
         # credit: https://stackoverflow.com/questions/4639506/os-walk-with-regex
