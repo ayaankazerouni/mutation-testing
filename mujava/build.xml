@@ -62,7 +62,8 @@
       haltonfailure="no"
       filtertrace="no"
       timeout="${exec.timeout}"
-      tempdir="./" >
+      tempdir="./"
+      dir="${basedir}"  >
       <classpath>
         <path refid="runmutes.classpath" />
         <dirset dir="${mutant_dir}" >
