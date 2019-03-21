@@ -21,20 +21,13 @@ class MutationRunner:
         all_mutators (list): All mutation operators provided by muJava.
     """
     # class attributes
-    all_mutators = 'all'
-    deletion_mutator = 'sdl'
+    mutators = ['sdl'] 
     sessionname = 'session'
     
-    def __init__(self, projectpath, mutators='deletion'):
+    def __init__(self, projectpath):
         self.projectpath = os.path.normpath(projectpath)
         self.projectname = os.path.basename(self.projectpath)
         self.clonepath = os.path.join('/tmp/mujava-testing', self.projectname, '')
-        if mutators == 'all':
-            self.mutators = self.all_mutators
-        elif mutators == 'deletion':
-            self.mutators = [self.deletion_mutator]
-        else:
-            raise ValueError('Mutators must be "all" or "deletion"')
 
         cwd = os.getcwd()
         self.antpath = os.path.join(cwd, 'build.xml')
@@ -47,11 +40,11 @@ class MutationRunner:
         self.gentime = None
         self.runtime = None
         self.coverage = None
-    
+
     def run(self):
         """
         Do the following:
-        
+
         .. code-block:: none
             1. Compile the project
             2. Setup the test session
@@ -89,7 +82,7 @@ class MutationRunner:
         if not success:
             output['success'] = False
             return output
-
+        
         self.setup_test_session()
 
         success, gentime = self.genmutes()
@@ -109,6 +102,11 @@ class MutationRunner:
             for result in mutationresults:
                 writer.writerow(result)
 
+        # write mujava results to file 
+        resultfile = os.path.join(self.clonepath, 'mujava-result.ndjson')
+        with open(resultfile, 'w') as outfile:
+            json.dump(output, outfile)
+
         return output 
 
     def compileproject(self):
@@ -121,14 +119,17 @@ class MutationRunner:
         antcmd = 'ant -f {} -Dresource_dir={} -Dbasedir={} clean compile' \
                     .format(self.antpath, self.libpath, self.clonepath) 
         logging.info('Compiling: {}'.format(antcmd))
-        result = subprocess.run(antcmd, shell=True, cwd=self.clonepath, stdout=subprocess.PIPE, 
-                                stderr=subprocess.PIPE, universal_newlines=True)
+        stdoutpath = os.path.join(self.clonepath, 'compile.log')
+        with open(stdoutpath, 'w') as outfile:
+            result = subprocess.run(antcmd, shell=True, cwd=self.clonepath, stdout=outfile, 
+                                    stderr=subprocess.STDOUT, universal_newlines=True)
         if result.returncode == 0:
-            logging.info(result.stdout)
+            logging.info('Compiled {}'.format(self.projectname))
             return True 
         else:
-            logging.error(result.stdout)
-            logging.error(result.stderr)
+            msg = 'There was an error compiling {}. See the compile log at {}'\
+                  .format(self.projectname, stdoutpath)
+            logging.error(msg)
             return False
 
     def setup_test_session(self):
@@ -265,18 +266,31 @@ class MutationRunner:
         antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} run') \
                  .format(self.antpath, self.clonepath, self.libpath)
         logging.info('Running mutant: {}'.format(antcmd))
+        stdoutpath = os.path.join(self.clonepath, 'runmutes.log')
         result = subprocess.run(antcmd, cwd=self.clonepath, shell=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 universal_newlines=True)
+        
 
-        if result.returncode == 0:
-            logging.info(result.stdout)
-            # was the mutant killed?
-            return 'tests failed' in result.stderr.lower()
-        else:
-            logging.error(result.stdout)
-            logging.error(result.stderr)
-            return None
+        stdoutpath = os.path.join(self.clonepath, 'runmutes.log')
+        with open(stdoutpath, 'a') as outfile:
+            if result.returncode == 0:
+                logging.info('Ran mutant {} for project {}'.format(mutantdir, self.projectname))
+                # write ANT output
+                outfile.write('Running mutant {} for project {}\n'.format(mutantdir, self.projectname))
+                outfile.write(result.stdout)
+                outfile.write(result.stderr)
+
+                # was the mutant killed?
+                return 'tests failed' in result.stderr.lower()
+            else:
+                msg = 'Project: {}. Error while running mutant: {}. See log file at {}' \
+                      .format(self.projectname, mutantdir, stdoutpath) 
+                logging.error(msg)
+                outfile.write('Running mutant {} for project {}\n'.format(mutantdir, self.projectname))
+                outfile.write(result.stdout)
+                outfile.write(result.stderr)
+                return None
 
     def __mutant_classes(self):
         # credit: https://stackoverflow.com/questions/4639506/os-walk-with-regex
