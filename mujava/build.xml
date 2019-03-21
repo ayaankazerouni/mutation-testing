@@ -3,14 +3,13 @@
   <property name="junit_reports" value="${basedir}/junitReports" />
   <property name="report_dir" value="${basedir}/reports" />
   <property name="bin_dir" value="${basedir}/classes/"/>
+  <property name="tmp_bin_dir" value="${basedir}/tmpbin/"/>
 
   <!-- timeout is in milliseconds -->
   <property name="exec.timeout" value="120000"/>
   <property name="build.compiler" value="modern"/>
 
   <echo message="resource_dir = ${resource_dir}" />
-  <echo message="mutant_dir = ${mutant_dir}" />
-  <echo message="mutant_class = ${mutant_class}" />
 
   <!-- classpath for building the project and test files -->
   <path id="mutation.classpath">
@@ -19,9 +18,9 @@
   
   <!-- classpath for running mutants -->
   <path id="runmutes.classpath">
+    <pathelement location="${tmp_bin_dir}" />
     <path refid="mutation.classpath" />
     <path location="${resource_dir}/JavaTddPluginSupport.jar" /> 
-    <pathelement location="${bin_dir}" /> <!-- original class files -->
   </path>
 
   <!-- delete output from previous runs -->
@@ -66,9 +65,6 @@
       dir="${basedir}"  >
       <classpath>
         <path refid="runmutes.classpath" />
-        <dirset dir="${mutant_dir}" >
-          <include name="${mutant_class}" />
-        </dirset>
       </classpath>
       <jvmarg value="-ea"/>
       <sysproperty key="student.TestCase.trimStackTraces" value="true"/>
@@ -93,7 +89,7 @@
       </batchtest>
     </junit>
     <concat destfile="${junit_reports}/results.csv">
-      <fileset dir="${junit_reports}" includes="*.csv" excludes="results.csv"/>
+      <fileset dir="${junit_reports}" includes="*.csv" excludes="results.csv timeout.csv" />
     </concat>
   </target>
 </project>

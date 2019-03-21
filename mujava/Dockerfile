@@ -5,15 +5,15 @@ ARG BASEDIR="/usr/src/app"
 ARG LIBDIR=${BASEDIR}/lib
 ARG PROJDIR="/tmp/mujava-testing"
 
-# classpath  
+RUN \
+  apt-get update && apt-get install -y \
+    ant \
+    python3 && \
+  rm -rf /var/lib/apt/lists/*;
+
 WORKDIR ${BASEDIR}
-RUN apt-get update && apt-get install -y \
-  ant \
-  python3 \
-  && rm -rf /var/lib/apt/lists/*;
 
 VOLUME ${PROJDIR}
 VOLUME ${BASEDIR}
 
-# CMD [ "python3", "mujava_runner.py" ]
-CMD ["bash"]
+CMD ["bash", "-c", "./mujava_runner.py tasks.ndjson > /usr/src/app/mutation-results.ndjson"]

@@ -2,6 +2,7 @@
 
 import os
 import re
+import csv
 import sys
 import json
 import time
@@ -9,6 +10,8 @@ import shutil
 import logging
 import argparse
 import subprocess
+
+ENGINE = 'mujava'
 
 class MutationRunner:
     """Runs muJava mutation testing on a specified project.
@@ -40,10 +43,37 @@ class MutationRunner:
                                  '{libdir}/commons-io.jar:{libdir}/junit.jar:'
                                  '{libdir}/student.jar:$JAVA_HOME/lib/tools.jar'
                                 ).format(libdir=self.libpath)
+
+        self.gentime = None
+        self.runtime = None
+        self.coverage = None
     
     def run(self):
-        """Create the muJava config file and run mutation testing 
-        on the current project.
+        """
+        Do the following:
+        
+        .. code-block:: none
+            1. Compile the project
+            2. Setup the test session
+            3. Generate mutants
+            4. Run tests against mutants
+
+        Returns a dict containing output information, and writes a CSV file
+        containing individual mutant information.
+
+        Returns:
+            (dict) A dictionary containing the keys below. If some keys are missing,
+            it means that the runner errored out during or before that step. 
+
+            .. code-block:: python
+            {
+                'projectPath': path to project (always present),
+                'success': boolean (always present),
+                'genTime': seconds taken to generate mutants,
+                'runTime': seconds taken to run mutants,
+                'coverage': proportion of mutants killed,
+                'num_mutations': number of mutations being run 
+            }
         """
         # projects were cloned already; assume they exist at self.clonepath
         # create mujavaCLI.config
@@ -51,23 +81,55 @@ class MutationRunner:
         with open(configpath, 'w') as f:
             f.write('MuJava_HOME={}'.format(os.path.normpath(self.clonepath)))
         
-        self.compileproject()
+        output = {
+            'projectPath': self.projectpath
+        }
+
+        success = self.compileproject()
+        if not success:
+            output['success'] = False
+            return output
+
         self.setup_test_session()
-        self.genmutes() 
-        self.runmutes()
+
+        success, gentime = self.genmutes()
+        output['genTime'] = gentime
+        if not success:
+            output['success'] = False
+            return output
+
+        results = self.runmutes()
+        mutationresults = results.pop('mutationresults')
+        output.update(results)
+         
+        fieldnames = ['project', 'className', 'engine', 'mutator', 'killed']
+        csvpath = os.path.join(self.clonepath, 'mutations.csv')
+        with open(csvpath, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',')
+            for result in mutationresults:
+                writer.writerow(result)
+
+        return output 
 
     def compileproject(self):
-        """Compile the project using ANT."""
+        """
+        Compile the project using ANT.
+        
+        Returns:
+            (bool): was the compilation successful?
+        """
         antcmd = 'ant -f {} -Dresource_dir={} -Dbasedir={} clean compile' \
                     .format(self.antpath, self.libpath, self.clonepath) 
         logging.info('Compiling: {}'.format(antcmd))
-        result = subprocess.run(antcmd, shell=True, cwd=self.clonepath,
-                                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        result = subprocess.run(antcmd, shell=True, cwd=self.clonepath, stdout=subprocess.PIPE, 
+                                stderr=subprocess.PIPE, universal_newlines=True)
         if result.returncode == 0:
             logging.info(result.stdout)
+            return True 
         else:
             logging.error(result.stdout)
             logging.error(result.stderr)
+            return False
 
     def setup_test_session(self):
         """Create the test session directory structure required by muJava.
@@ -120,7 +182,12 @@ class MutationRunner:
             shutil.copy(filepath, dest)
 
     def genmutes(self):
-        """Use muJava to generated mutants."""
+        """
+        Use muJava to generated mutants.
+
+        Returns:
+            (bool, float): Success and running time in seconds
+        """
         # generate mutants
         mutators = ' '.join(list(map(lambda m: '-{}'.format(m), self.mutators)))
         start = time.time()
@@ -128,42 +195,88 @@ class MutationRunner:
                       .format(self.mujava_classpath, mutators, self.sessionname)
         logging.info('Generating mutants: {}'.format(genmutescmd))
         result = subprocess.run(genmutescmd, cwd=self.clonepath, shell=True,
-                                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                                stderr=subprocess.PIPE, stdout=subprocess.PIPE,
+                                universal_newlines=True)
         runningtime = time.time() - start
         if result.returncode == 0:
             logging.info(result.stdout)
-        else:
-            logging.error(result.stdout)
-            logging.error(result.stderr)    
-        self.gentime = runningtime
-
-    def runmutes(self):
-        # original class files
-        original = os.path.join(self.clonepath, 'classes')
-
-        # find mutated class files 
-        mutated = self.__mutant_classes()
-        total = len(mutated)
-        count = 0
-        for mutantdir, mutantclass in mutated:
-            self.__runmutant(mutantdir, mutantclass)
-            count = count + 1
-            print('Ran {:.2%}'.format(count / total))
-
-    def __runmutant(self, mutantdir, mutantclass):
-        mutantdir = "'{}'".format(mutantdir)
-        antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dmutant_class={} '
-                  '-Dmutant_dir={} run') \
-                 .format(self.antpath, self.clonepath, self.libpath,
-                         mutantclass, mutantdir)
-        logging.info('Running mutant: {}'.format(antcmd))
-        result = subprocess.run(antcmd, cwd=self.clonepath, shell=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            logging.info(result.stdout)
+            return (True, runningtime)
         else:
             logging.error(result.stdout)
             logging.error(result.stderr)
+            return (False, runningTime)
+
+    def runmutes(self):
+        """
+        Run the supplied JUnit tests on all mutants found in the directory:
+        `{projectRoot}/{self.sessionname}/result`.
+
+        All class files matching the glob `*Test.class` are treated as tests.
+        """
+        # original class files
+        original = os.path.join(self.clonepath, 'classes')
+
+        # find mutated class files and mutate
+        mutated = self.__mutant_classes()
+        total = len(mutated)
+        killedcount = 0
+        mutationresults = []
+        err = False
+        start = time.time()
+        for mutantdir, mutantclass in mutated:
+            classname, _ = os.path.splitext(mutantclass)
+            mutator = os.path.basename(mutantdir).split('_')[0]
+            killed = self.__runmutant(mutantdir, mutantclass)
+            if killed:
+                killedcount = killedcount + 1
+            elif killed is None: # running this mutant errored out
+                err = True
+            mutationresults.append({
+                'project': self.projectname,
+                'className': classname,
+                'engine': ENGINE,
+                'mutator': mutator,
+                'killed': killed
+            })
+        runningtime = time.time() - start
+        coverage = killedcount / total
+        
+        return {
+            'coverage': coverage,
+            'runtime': runningtime,
+            'success': not err,
+            'mutationresults': mutationresults
+        }
+
+    def __runmutant(self, mutantdir, mutantclass):
+        # create tmp bin directory
+        tmpdir = os.path.join(self.clonepath, 'tmpbin')
+        if os.path.exists(tmpdir):
+            shutil.rmtree(tmpdir)
+        os.makedirs(tmpdir)
+        classes = os.path.join(self.clonepath, 'classes')
+        for filename in os.listdir(classes):
+            if filename != mutantclass:
+                shutil.copy(os.path.join(classes, filename), os.path.join(tmpdir, filename))
+        mutantsrc = os.path.join(mutantdir, mutantclass)
+        shutil.copy(mutantsrc, os.path.join(tmpdir, mutantclass))
+        
+        # run junit tests using the new set of classfiles
+        antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} run') \
+                 .format(self.antpath, self.clonepath, self.libpath)
+        logging.info('Running mutant: {}'.format(antcmd))
+        result = subprocess.run(antcmd, cwd=self.clonepath, shell=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                universal_newlines=True)
+
+        if result.returncode == 0:
+            logging.info(result.stdout)
+            # was the mutant killed?
+            return 'tests failed' in result.stderr.lower()
+        else:
+            logging.error(result.stdout)
+            logging.error(result.stderr)
+            return None
 
     def __mutant_classes(self):
         # credit: https://stackoverflow.com/questions/4639506/os-walk-with-regex
@@ -218,9 +331,8 @@ if __name__ == '__main__':
                 projectpath = task['projectPath']
                 projectname = os.path.basename(projectpath)
                 runner = MutationRunner(os.path.join(outerdir, projectname))
-                runner.run()
-                result = { 'projectPath': projectpath, 'genTime': runner.gentime }
-                print(json.dumps(result))
+                output = runner.run()
+                print(json.dumps(output))
     else:
         print('Error! Need a taskfile')
         parser.print_help()
