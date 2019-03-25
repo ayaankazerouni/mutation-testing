@@ -8,7 +8,7 @@ Overview:
  - Create artificial package structure for the project so that
    PIT doesn't try to mutate itself (e.g., com.example)
  - Assumes the following project structure: {project-root}/{src}/{*.java}
- - Run PIT from the ANT build file (assumed to be in the current directory)
+ - Run PIT from the ANT build file
 
 Mutation testing dependencies:
  - ANT (https://ant.apache.org)

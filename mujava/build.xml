@@ -1,6 +1,5 @@
 <project name="mutation-testing" default="compile">
 
-  <property name="junit_reports" value="${basedir}/junitReports" />
   <property name="report_dir" value="${basedir}/reports" />
   <property name="bin_dir" value="${basedir}/classes/"/>
   <property name="tmp_bin_dir" value="${basedir}/tmpbin/"/>
@@ -27,15 +26,13 @@
   <target name="clean">
     <delete dir="${bin_dir}" />
     <delete dir="${report_dir}" />
-    <delete dir="${junit_reports}" />
   </target>
 
   <!-- compile project files -->
   <target name="compile" depends="clean">
-    <mkdir dir="${junit_reports}"/>
     <mkdir dir="${report_dir}"/>
     <mkdir dir="${bin_dir}"/>
-    <record name="${report_dir}/compile.log" action="start"/>
+    <record name="${report_dir}/.compilelog" action="start"/>
     <javac
       srcdir="src/"
       destdir="${bin_dir}"
@@ -47,7 +44,7 @@
       <compilerarg value="-Xlint:empty"/>
       <compilerarg value="-Xlint:fallthrough"/>
     </javac>
-    <record name="${report_dir}/compile.log" action="stop"/>
+    <record name="${report_dir}/.compilelog" action="stop"/>
   </target>
 
   <!-- run the unit tests on a mutant and write results to csv --> 
@@ -77,19 +74,12 @@
       <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.maximum" value="4000"/>
       <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.logfile" value="${junit_reports}/timeout.csv"/>
       <sysproperty key="student.testingsupport.junit4.AdaptiveTimeout.user" value="${user.dir}"/>
-      <sysproperty key="net.sf.webcat.plugins.javatddplugin.CsvJUnitResultFormatter.prefix" value="${user.dir}"/>
-      <formatter
-        classname="net.sf.webcat.plugins.javatddplugin.CsvJUnitResultFormatter"
-        extension=".csv" />
-      <batchtest todir="${junit_reports}">
+      <batchtest>
         <fileset dir="${bin_dir}">
           <include name="**/*Test.class" />
           <exclude name="reports/"/>
         </fileset>
       </batchtest>
     </junit>
-    <concat destfile="${junit_reports}/results.csv">
-      <fileset dir="${junit_reports}" includes="*.csv" excludes="results.csv timeout.csv" />
-    </concat>
   </target>
 </project>

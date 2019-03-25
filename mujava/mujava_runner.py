@@ -1,4 +1,23 @@
 #! /usr/bin/env python3
+"""
+Author: Ayaan Kazerouni <ayaan@vt.edu>
+Description: Run mutation analysis using muJava on projects from a taskFile.
+
+Overview:
+ - Copy project to /tmp/
+ - Assumes the following project structure: {project-root}/{src}/{*.java}
+ - Run muJava from the mujava.jar, which includes muScript (https://cs.gmu.edu/~offutt/mujava/muscript/) 
+
+Mutation testing dependencies:
+ - ANT (https://ant.apache.org)
+ - muJava (https://cs.gmu.edu/~offutt/mujava/)
+ - see lib/ for required jars to get muJava running
+
+Usage:
+ - Run as a CLI tool on one or more projects using a task file.
+   Usage: see ./mujava_runner.py --help
+ - import mutation_runner 
+"""
 
 import os
 import re
