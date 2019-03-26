@@ -2,7 +2,7 @@
 
 Enable automated mutation testing using the following:
 - [x] PIT
-- [ ] muJava
+- [x] muJava
 
 ## Overview
 ### [PIT](https://pitest.org)
