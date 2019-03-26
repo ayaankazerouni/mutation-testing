@@ -134,6 +134,13 @@ class MutationRunner:
         'EMPTY_RETURNS'
     ]
 
+    sufficient_mutators = [
+        'ABS',
+        'AOR',
+        'ROR',
+        'UOI'
+    ]
+
     default_mutators = [
         'CONDITIONALS_BOUNDARY',
         'INCREMENTS',
@@ -175,8 +182,10 @@ class MutationRunner:
             self.mutators = self.deletion_mutators
         elif mutators == 'default':
             self.mutators = self.default_mutators
+        elif mutators == 'sufficient':
+            self.mutators = self.sufficient_mutators
         else:
-            raise ValueError('Mutators must be "all", "deletion", or "default"')
+            raise ValueError('Mutators must be "all", "deletion", "sufficient" or "default"')
 
         cwd = os.getcwd()
         self.antpath = antpath or os.path.join(cwd, 'build.xml')
@@ -272,7 +281,7 @@ class MutationRunner:
         return (targetclasses, targettests)
 
 def _check_mutators(val):
-    valid = ['all', 'default', 'deletion']
+    valid = ['all', 'default', 'deletion', 'sufficient']
     if val not in valid:
         raise argparse.ArgumentTypeError(
                 '{} is not in the valid list of mutator sets {}'.format(val, valid)
@@ -293,7 +302,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--steps', action='store_true', 
                         help='run each mutator one-by-one?')
     parser.add_argument('-m', '--mutators', default='all', type=_check_mutators, 
-                        help='set of mutators to run (all|default|deletion)')
+                        help='set of mutators to run (all|default|deletion|sufficient)')
     if sys.argv[1:]:
         args = parser.parse_args()
         main(args)
