@@ -36,109 +36,9 @@ pit_default = [
     'ReturnVals',
     'VoidMethodCall'
 ]
+
 def mutator_in_subset(mutator, subset):
     return any([x in mutator for x in subset])
-
-def main_subset_data(pit_mutations=None, submissions=None):
-    """Get data for full, default, deletion, and sufficient operator
-    subsets.
-
-    Returns a DataFrame containing, for each main operator subset, in each project, 
-    the coverage achieved, running time, efficiency, and the number of mutants
-    (total and per loc).
-    """
-    if pit_mutations is None:
-        pit_mutations = pd.read_csv(pit_mutations_path)
-    if submissions is None:
-        submissions = getsubmissions(webcat_path, list(pit_mutations.userName.unique()), ['Project 2'])
-    
-    deletion = pit_mutations.groupby('userName') \
-                            .apply(data_for_subset, submissions, subset=pit_deletion, prefix='deletion')
-    sufficient = pit_mutations.groupby('userName') \
-                              .apply(data_for_subset, submissions, subset=pit_sufficient, prefix='sufficient')
-    default = pit_mutations.groupby('userName') \
-                           .apply(data_for_subset, submissions, subset=pit_default, prefix='default')
-    full = pit_mutations.groupby('userName') \
-                        .apply(data_for_subset, submissions, prefix='full')
-    
-    mutdata = deletion.merge(right=sufficient, right_index=True, left_index=True) \
-                      .merge(right=default, right_index=True, left_index=True) \
-                      .merge(right=full, right_index=True, left_index=True)
-    
-    # populate running time columns for each subset
-    mutdata = __get_running_time('pit-all-results.ndjson', 'full_runningTime', mutdata)
-    mutdata = __get_running_time('pit-default-results.ndjson', 'default_runningTime', mutdata)
-    mutdata = __get_running_time('pit-deletion-results.ndjson', 'deletion_runningTime', mutdata)
-    mutdata = __get_running_time('pit-sufficient-results.ndjson', 'sufficient_runningTime', mutdata)
-    
-    return mutdata.merge(right=submissions, right_index=True, left_index=True)
-
-def __get_running_time(resultfile, colname, mutdata):
-    with open(os.path.join(pit_results_path, resultfile)) as infile:
-        for line in infile:
-            result = json.loads(line)
-            username = os.path.basename(result['projectPath'])
-            runningtime = result['runningTime']
-            mutdata.loc[username, colname] = runningtime
-    return mutdata
-    
-def per_user_mutator_subset_data(subset, pit_mutations=None, submissions=None):
-    """Get summary data for the specified subset, for each student."""
-    if pit_mutations is None:
-        pit_mutations = pd.read_csv(pit_mutations_path, index_col=['userName'])
-    if submissions is None:
-        submissions = getsubmissions(webcat_path, list(pit_mutations.userName.unique()), ['Project 2'])
-    mutdata = pit_mutations.groupby('userName').apply(data_for_subset, submissions, subset)
-    
-    return mutdata
-
-def data_for_subset(df, submissions, subset=None, prefix=''):
-    """Gets number of mutants, coverage, survival, and efficiency for the given
-    subset of mutation operators.
-    
-    This function acts on the given DataFrame without grouping by any fields. Can
-    use this as a lambda in an outer split-apply operation.
-    
-    Args:
-        df (pd.DataFrame): A dataframe of "raw" PIT mutations.csv data
-        submissions (int, pd.DataFrame): Submissions 
-        subset (list, default=None): A list of mutation operators in the subset, omit for
-                                     all operators.
-        prefix (str, default=''): A prefix for output items (prefix_num, prefix_cov, etc.)
-    
-    Returns:
-        A Series or dict containing the obtained information, with keys prefixed by `prefix`.
-    """
-    username = df.name
-    if subset is not None:
-        df = df[df.apply(lambda r: mutator_in_subset(r.mutator, subset), axis=1)]
-
-    if prefix:
-        prefix = '{}_'.format(prefix)
-
-    # compute subset specific data
-    num = df.shape[0]
-    cov = df.query('killed not in ["SURVIVED", "NO_COVERAGE"]').shape[0] / num
-    survival = 1 - cov
-    result = {
-        '{}num'.format(prefix): num,
-        '{}cov'.format(prefix): cov,
-        '{}survival'.format(prefix): survival
-    }
-    
-    if submissions is not None:
-        loc = submissions.loc[username]['statements.nontest']
-        eff = efficiency(num, loc, cov)
-        mpl = num / loc
-        result['{}eff'.format(prefix)] = eff
-        result['{}mpl'.format(prefix)] = mpl
-    
-    return pd.Series(result)
-
-def efficiency(mutantcount, loc, coverage):
-    survival = 1 - coverage
-    mpl = mutantcount / loc
-    return survival / mpl
 
 def getsubmissions(webcat_path, users, assignments): 
     """Get Web-CAT submissions for the specified users on the specified assignments.""" 
@@ -153,20 +53,17 @@ def getsubmissions(webcat_path, users, assignments):
             'elementsCovered']
     return submissions[cols].set_index('userName')
 
-def get_mutator_specific_data(pit_mutations=None, joined=None):
-    """Get characteristics of individual mutation operators,
-    averaged across student projects.
-    """
+def get_mutator_specific_data(pit_mutations=None, submissions=None):
+    """Get characteristics of individual mutation operators, for each project."""
     if pit_mutations is None:
         pit_mutations = pd.read_csv(pit_mutations_path)
-    pit_mutations['mutator'] = pit_mutations['mutator'].apply(clean_mutator_name)
-    return pit_mutations.groupby(['userName', 'mutator']).apply(__mut_user_data, joined)
 
-def all_mutator_data(mutators, measure):
-    """Get the mean of mutator data across projects.""" 
-    return mutators[measure].reset_index() \
-                            .pivot(index='userName', columns='mutator', values=measure)
-    
+    if submissions is None:
+        submissions = getsubmissions(webcat_path=webcat_path, users=pit_mutations.userName.unique(),
+                                     assignments=['Project 2'])
+    pit_mutations['mutator'] = pit_mutations['mutator'].apply(clean_mutator_name)
+    return pit_mutations.groupby(['userName', 'mutator']).apply(__mut_user_data, submissions)
+
 def __mut_user_data(mutations, joined):
     username, _ = mutations.name
     total = mutations.shape[0]
@@ -174,15 +71,22 @@ def __mut_user_data(mutations, joined):
     killed = total - survived
     loc = joined.loc[username, 'statements.nontest']
     survival = survived / total
-    coverage = killed / total
     mpl = total / loc
     return pd.Series({
         'num_mutants': total,
         'num_killed': killed,
-        'coverage': coverage,
+        'coverage': killed / total,
         'mutantsPerLoc': mpl,
         'efficiency': survival / mpl
     })
+
+def all_mutator_data(mutators, measure):
+    """Get a specific characteristic of all mutators.
+    
+    Used to format things for modelling.
+    """ 
+    return mutators[measure].reset_index() \
+                            .pivot(index='userName', columns='mutator', values=measure)
 
 def factorisedsubsets(df, dv):
     """Return a DataFrame with the operator subset as a factor. Use the result
