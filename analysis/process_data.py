@@ -20,25 +20,22 @@ pit_deletion = [
     'VoidMethodCall',
     'NonVoidMethodCall',
     'ConstructorCall',
-    'BooleanTrueReturn',
-    'BooleanFalseReturn',
+    'BooleanTrueReturnVals',
+    'BooleanFalseReturnVals',
     'PrimitiveReturns',
-    'EmptyObjectReturn'
+    'EmptyObjectReturnVals'
 ]
 
 pit_sufficient = ['ABS', 'ROR', 'AOD', 'UOI']
 
 pit_default = [
     'ConditionalsBoundary',
-    'IncrementsMutator',
-    'MathMutator',
+    'Increments',
+    'Math',
     'NegateConditionals',
     'ReturnVals',
     'VoidMethodCall'
 ]
-
-def mutator_in_subset(mutator, subset):
-    return any([x in mutator for x in subset])
 
 def getsubmissions(webcat_path, users, assignments): 
     """Get Web-CAT submissions for the specified users on the specified assignments.""" 
@@ -62,9 +59,9 @@ def get_mutator_specific_data(pit_mutations=None, submissions=None):
         submissions = getsubmissions(webcat_path=webcat_path, users=pit_mutations.userName.unique(),
                                      assignments=['Project 2'])
     pit_mutations['mutator'] = pit_mutations['mutator'].apply(clean_mutator_name)
-    return pit_mutations.groupby(['userName', 'mutator']).apply(__mut_user_data, submissions)
+    return pit_mutations.groupby(['userName', 'mutator']).apply(__mutator_specific_data_helper, submissions)
 
-def __mut_user_data(mutations, joined):
+def __mutator_specific_data_helper(mutations, joined):
     username, _ = mutations.name
     total = mutations.shape[0]
     survived = mutations.query('killed == "SURVIVED"').shape[0]
@@ -80,10 +77,49 @@ def __mut_user_data(mutations, joined):
         'efficiency': survival / mpl
     })
 
+def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
+    """Get characteristic data for the specified subset.
+    
+    Args:
+        subset (list): A list of mutation operators
+        submissions (pd.DataFrame): Web-CAT submissions. Required for
+                                    efficiency and mutants per loc
+    
+    Returns:
+        A DataFrame containing columns "{prefix}_{measure}", where measure
+        is num, cov, eff, and mpl
+    """
+    df = df.reset_index()
+    if subset is not None:
+        df = df.query('mutator in @subset')
+    return df.groupby('userName').apply(aggregate_data, submissions, prefix)
+
+def aggregate_data(df, submissions=None, prefix=''):
+    username = df.name
+    
+    if prefix:
+        prefix = '{}_'.format(prefix)
+    
+    num = df['num_mutants'].sum()
+    cov = df['num_killed'].sum() / num
+    result = {
+        '{}num'.format(prefix): num,
+        '{}cov'.format(prefix): cov,
+    }
+    
+    if submissions is not None:
+        loc = submissions.loc[username, 'statements.nontest']
+        mpl = num / loc
+        efficiency = (1 - cov) / mpl
+        result['{}eff'.format(prefix)] = efficiency
+        result['{}mpl'.format(prefix)] = mpl
+    
+    return pd.Series(result)
+
 def all_mutator_data(mutators, measure):
     """Get a specific characteristic of all mutators.
     
-    Used to format things for modelling.
+    Use to format things for modelling.
     """ 
     return mutators[measure].reset_index() \
                             .pivot(index='userName', columns='mutator', values=measure)
