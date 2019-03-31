@@ -70,15 +70,54 @@ def __mutator_specific_data_helper(mutations, joined):
     survival = survived / total
     mpl = total / loc
     return pd.Series({
-        'num_mutants': total,
-        'num_killed': killed,
-        'coverage': killed / total,
-        'mutantsPerLoc': mpl,
-        'efficiency': survival / mpl
+        'num': total,
+        'killed': killed,
+        'cov': killed / total,
+        'surv': survived / total,
+        'mpl': mpl,
+        'eff': survival / mpl
     })
+
+def get_running_time(resultfile):
+    """Get running time from the NDJSON file at `resultfile`."""
+    results = {}
+    with open(os.path.join(pit_results_path, resultfile)) as infile:
+        for line in infile:
+            result = json.loads(line)
+            username = os.path.basename(result['projectPath'])
+            runningtime = result['runningTime']
+            results[username] = runningtime
+    return pd.Series(results)
+
+def get_main_subset_data(mutators, submissions):
+    """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
+    
+    Args:
+        mutators (pd.DataFrame): Per-mutator, per-project data, as returned by `get_mutator_specific_data`
+    
+    Returns:
+        A DataFrame containing columns {subset}_cov, {subset}_surv, {subset}_mpl, {subset}_num, and
+        {subset}_runningTime, where subset is each of the main subsets.
+    """
+    deletion = get_data_for_subset(mutators, submissions=submissions,subset=pit_deletion, prefix='deletion')
+    default = get_data_for_subset(mutators, submissions=submissions, subset=pit_default, prefix='default')
+    sufficient = get_data_for_subset(mutators, submissions=submissions, subset=pit_sufficient, prefix='sufficient')
+    full = get_data_for_subset(mutators, submissions=submissions, prefix='full')
+    joined = deletion.merge(right=default, right_index=True, left_index=True) \
+                     .merge(right=sufficient, right_index=True, left_index=True) \
+                     .merge(right=full, right_index=True, left_index=True)
+    
+    # assumes these files exist
+    joined['deletion_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-deletion-results.ndjson')
+    joined['full_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-all-results.ndjson')
+    joined['default_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-default-results.ndjson')
+    joined['sufficient_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-sufficient-results.ndjson')
+    
+    return joined
 
 def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
     """Get characteristic data for the specified subset.
+    Acts on data as returned by `get_mutator_specific_data`.
     
     Args:
         subset (list): A list of mutation operators
@@ -100,17 +139,19 @@ def aggregate_data(df, submissions=None, prefix=''):
     if prefix:
         prefix = '{}_'.format(prefix)
     
-    num = df['num_mutants'].sum()
-    cov = df['num_killed'].sum() / num
+    num = df['num'].sum()
+    cov = df['killed'].sum() / num
+    surv = 1 - cov
     result = {
         '{}num'.format(prefix): num,
         '{}cov'.format(prefix): cov,
+        '{}surv'.format(prefix): surv
     }
     
     if submissions is not None:
         loc = submissions.loc[username, 'statements.nontest']
         mpl = num / loc
-        efficiency = (1 - cov) / mpl
+        efficiency = surv / mpl
         result['{}eff'.format(prefix)] = efficiency
         result['{}mpl'.format(prefix)] = mpl
     
