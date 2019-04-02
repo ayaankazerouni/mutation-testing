@@ -185,11 +185,21 @@ class MutationRunner:
         elif mutators == 'sufficient':
             self.mutators = self.sufficient_mutators
         else:
-            raise ValueError('Mutators must be "all", "deletion", "sufficient" or "default"')
+            mutators = mutators.split(',')
+            if MutationRunner.__check_mutators(mutators):
+                self.mutators = mutators
+            else:
+                raise ValueError(('Use keywords all, deletion, default, sufficient, '
+                                'or a comma-separated valid set of mutation operators'))
 
         cwd = os.getcwd()
         self.antpath = antpath or os.path.join(cwd, 'build.xml')
         self.libpath = libpath or os.path.join(cwd, 'lib')
+
+    @classmethod
+    def __check_mutators(cls, mutators):
+        return all([x in cls.all_mutators for x in mutators])
+
 
     def testsingleproject(self):
         """Run mutation testing on a single project.
@@ -280,15 +290,6 @@ class MutationRunner:
 
         return (targetclasses, targettests)
 
-def _check_mutators(val):
-    valid = ['all', 'default', 'deletion', 'sufficient']
-    if val not in valid:
-        raise argparse.ArgumentTypeError(
-                '{} is not in the valid list of mutator sets {}'.format(val, valid)
-        )
-
-    return val
-    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
             description='Run mutation analysis on projects from a taskFile.'
@@ -301,7 +302,7 @@ if __name__ == '__main__':
                         default=logging.WARN, help='if given, sets log level to INFO')
     parser.add_argument('-s', '--steps', action='store_true', 
                         help='run each mutator one-by-one?')
-    parser.add_argument('-m', '--mutators', default='all', type=_check_mutators, 
+    parser.add_argument('-m', '--mutators', default='all',
                         help='set of mutators to run (all|default|deletion|sufficient)')
     if sys.argv[1:]:
         args = parser.parse_args()
