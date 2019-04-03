@@ -40,14 +40,14 @@ pit_default = [
 def getsubmissions(webcat_path, users, assignments): 
     """Get Web-CAT submissions for the specified users on the specified assignments.""" 
     pluscols = ['statements', 'statements.test', 'statements.nontest', 
-                'methods.test', 'methods.nontest']
+                'methods.test', 'methods.nontest', 'conditionals.nontest']
     submissions = consolidate_sensordata \
             .load_submission_data(webcat_path, pluscols=pluscols) \
             .reset_index() \
             .query('userName in @users and assignment in @assignments')
     cols = ['userName', 'score.correctness', 'methods.test', 'methods.nontest', 
             'statements', 'statements.test', 'statements.nontest', 
-            'elementsCovered']
+            'elementsCovered', 'conditionals.nontest']
     return submissions[cols].set_index('userName')
 
 def get_mutator_specific_data(pit_mutations=None, submissions=None):
@@ -93,25 +93,43 @@ def get_main_subset_data(mutators, submissions):
     """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
     
     Args:
-        mutators (pd.DataFrame): Per-mutator, per-project data, as returned by `get_mutator_specific_data`
+        mutators (pd.DataFrame): Per-mutator, per-project data, as returned by 
+                                 `get_mutator_specific_data`
+        submissions (pd.DataFrame): Submission data for student projects, as 
+                                    returned by `getsubmissions`
     
     Returns:
-        A DataFrame containing columns {subset}_cov, {subset}_surv, {subset}_mpl, {subset}_num, and
-        {subset}_runningTime, where subset is each of the main subsets.
+        A DataFrame containing columns {subset}_cov, {subset}_surv, {subset}_mpl, 
+        {subset}_num, and {subset}_runningTime, where subset is each of the main subsets.
     """
-    deletion = get_data_for_subset(mutators, submissions=submissions,subset=pit_deletion, prefix='deletion')
+    deletion = get_data_for_subset(mutators, submissions=submissions, subset=pit_deletion, prefix='deletion')
     default = get_data_for_subset(mutators, submissions=submissions, subset=pit_default, prefix='default')
-    sufficient = get_data_for_subset(mutators, submissions=submissions, subset=pit_sufficient, prefix='sufficient')
+    sufficient = get_data_for_subset(mutators, submissions=submissions, subset=pit_sufficient, 
+                                     prefix='sufficient')
     full = get_data_for_subset(mutators, submissions=submissions, prefix='full')
+    subset1 = ['RemoveConditional', 'BooleanTrueReturnVals', 'ConstructorCall']
+    reduced_subset1 = get_data_for_subset(mutators, subset=subset1, submissions=submissions, prefix='subset1')
     joined = deletion.merge(right=default, right_index=True, left_index=True) \
                      .merge(right=sufficient, right_index=True, left_index=True) \
-                     .merge(right=full, right_index=True, left_index=True)
+                     .merge(right=full, right_index=True, left_index=True) \
+                     .merge(right=reduced_subset1, right_index=True, left_index=True)
     
-    # assumes these files exist
-    joined['deletion_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-deletion-results.ndjson')
-    joined['full_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-all-results.ndjson')
-    joined['default_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-default-results.ndjson')
-    joined['sufficient_runningTime'] = get_running_time(resultfile=pit_results_path + '/pit-sufficient-results.ndjson')
+    # main subsets
+    for filename in os.listdir(pit_results_path):
+        name, ext = os.path.splitext(filename)
+        if ext != '.ndjson':
+            continue
+        
+        # main subsets
+        if  name.startswith('pit'):
+            subset = name.split('-')[1]
+        elif name.startswith('inc'):
+            subset = ''.join(name.split('-')[:2])
+        else: 
+            continue
+
+        filepath = os.path.join(pit_results_path, filename)
+        joined['{}_runningtime'.format(subset)] = get_running_time(resultfile=filepath)
     
     return joined
 
