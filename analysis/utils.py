@@ -58,7 +58,7 @@ def get_mutator_specific_data(pit_mutations=None, submissions=None):
     if submissions is None:
         submissions = getsubmissions(webcat_path=webcat_path, users=pit_mutations.userName.unique(),
                                      assignments=['Project 2'])
-    pit_mutations['mutator'] = pit_mutations['mutator'].apply(clean_mutator_name)
+    pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name)
     return pit_mutations.groupby(['userName', 'mutator']).apply(__mutator_specific_data_helper, submissions)
 
 def __mutator_specific_data_helper(mutations, joined):
@@ -196,11 +196,20 @@ def factorisedsubsets(df, dv):
     full = 'full_{}'.format(dv)
     result = df[['userName', deletion, default, sufficient, full]] \
         .melt(id_vars=['userName'], value_vars=[deletion, default, sufficient, full], 
-              var_name='op_subset', value_name='value') \
+              var_name='subset', value_name=dv) \
         .set_index('userName')
+    result['subset'] = result['subset'].apply(__clean_subset_name)
     return result
 
-def clean_mutator_name(name):
+def __clean_subset_name(n):
+    if n.startswith('deletion'):
+        return 'Deletion'
+    if n.startswith('sufficient'):
+        return 'Sufficient'
+    if n.startswith('full'):
+        return 'Full'
+
+def __clean_mutator_name(name):
     """Sanitise mutation operator names."""
     # some mutants are prefixed and have subtypes, e.g., AOR1Mutator, CRCR5Mutator, etc.
     prefixes = ['AOR', 'AOD', 'ROR', 'UOI', 'OBBN', 'CRCR', 'RemoveConditional']
