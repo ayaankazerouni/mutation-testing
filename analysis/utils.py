@@ -37,15 +37,18 @@ pit_default = [
     'VoidMethodCall'
 ]
 
-def getsubmissions(webcat_path, users, assignments): 
+def getsubmissions(webcat_path, assignments, users=None): 
     """Get Web-CAT submissions for the specified users on the specified assignments.""" 
     pluscols = ['statements', 'statements.test', 'statements.nontest', 
                 'methods.test', 'methods.nontest', 'conditionals.nontest']
+    q = 'assignment in @assignments'
+    if users is not None:
+        q = 'userName in @users and ' + q
     submissions = consolidate_sensordata \
             .load_submission_data(webcat_path, pluscols=pluscols) \
             .reset_index() \
-            .query('userName in @users and assignment in @assignments')
-    cols = ['userName', 'score.correctness', 'methods.test', 'methods.nontest', 
+            .query(q)
+    cols = ['userName', 'score', 'methods.test', 'methods.nontest', 
             'statements', 'statements.test', 'statements.nontest', 
             'elementsCovered', 'conditionals.nontest']
     return submissions[cols].set_index('userName')
@@ -189,13 +192,10 @@ def factorisedsubsets(df, dv):
 
     Takes as input a DataFrame as returned by get_mutator_data.
     """
+    valuecols = list(df.filter(regex='_{}$'.format(dv)).columns)
     df = df.reset_index()
-    deletion = 'deletion_{}'.format(dv)
-    default = 'default_{}'.format(dv)
-    sufficient = 'sufficient_{}'.format(dv)
-    full = 'full_{}'.format(dv)
-    result = df[['userName', deletion, default, sufficient, full]] \
-        .melt(id_vars=['userName'], value_vars=[deletion, default, sufficient, full], 
+    result = df[['userName'] + valuecols] \
+        .melt(id_vars=['userName'], value_vars=valuecols,
               var_name='subset', value_name=dv) \
         .set_index('userName')
     result['subset'] = result['subset'].apply(__clean_subset_name)
@@ -208,6 +208,8 @@ def __clean_subset_name(n):
         return 'Sufficient'
     if n.startswith('full'):
         return 'Full'
+
+    return n
 
 def __clean_mutator_name(name):
     """Sanitise mutation operator names."""
