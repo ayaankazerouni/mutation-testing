@@ -31,10 +31,6 @@ import logging
 import argparse
 from shutil import rmtree, copytree
 
-module_path = os.path.abspath('..')
-if module_path not in sys.path:
-    sys.path.append(module_path)
-
 import utils
 
 def main(args):
@@ -215,7 +211,7 @@ class MutationRunner:
             (dict): The coverage percentages, completed subprocess, and running time
                     for each mutation operator (if self.steps)
         """
-        utils.clone_project(self.projectpath, self.clonepath)
+        # utils.clone_project(self.projectpath, self.clonepath)
 
         if not self.steps:
             start = time.time()
