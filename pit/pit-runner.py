@@ -298,8 +298,10 @@ if __name__ == '__main__':
                         default=logging.WARN, help='if given, sets log level to INFO')
     parser.add_argument('-s', '--steps', action='store_true', 
                         help='run each mutator one-by-one?')
-    parser.add_argument('-m', '--mutators', default='all',
-                        help='set of mutators to run (all|default|deletion|sufficient)')
+    parser.add_argument('-m', '--mutators', default='deletion',
+                        help=('set of mutators to run: one of [all|default|deletion|sufficient] or '
+                            'a list of comma-separated mutator names, as seen in the PIT documentation.'
+                            ' Defaults to "deletion".'))
     if sys.argv[1:]:
         args = parser.parse_args()
         main(args)
