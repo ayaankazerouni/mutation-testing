@@ -8,6 +8,8 @@ Mutation testing tools enabled:
 ## Overview
 ### [PIT](https://pitest.org)
 
+See the [proposal](pit/proposal.md) for details.
+
 Usage: [`./pit_runner.py --help`](pit/pit_runner.py)
 
 [pit/pit-runner.py](pit/pit_runner.py) can PIT with different possible sets of operators:
