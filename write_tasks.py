@@ -46,7 +46,7 @@ def write_successful(resultpath, n_projects):
 def write_all_projects(dirpath):
     """Write out paths to all projects within the specified dirpath."""
     for item in os.listdir(dirpath):
-        obj = {'projectPath': item}
+        obj = {'projectPath': os.path.join(dirpath, item)}
         print(json.dumps(obj))
 
 
