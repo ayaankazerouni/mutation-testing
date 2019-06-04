@@ -35,18 +35,22 @@ def get_mutation_coverage(resultspath):
 def __combiner(resultspath):
     return pd.Series(get_mutation_coverage(resultspath))
 
-def aggregate_mutation_results(dirpath):
+def aggregate_mutation_results(dirpath, aggregate=False):
     """
     Aggregate output from mutation testing by reading PITest reports.
 
     Args:
         dirpath (str): Path to the directory containing tested projects
+        aggregate (bool): Summarise each student's mutation score or return
+                          data for all mutants?
     """
     if not os.path.isabs(dirpath):
         dirpath = os.path.abspath(dirpath)
 
     projects = os.listdir(dirpath)
     resultpaths = {}
+
+    results = []
 
     for proj in projects:
         projpath = os.path.join(dirpath, proj)
@@ -55,7 +59,13 @@ def aggregate_mutation_results(dirpath):
 
         # are there mutation results to speak of?
         if os.path.isfile(mutationscsv) and os.path.isdir(mutationshtml):
-            resultpaths[proj] = mutationscsv
+            if aggregate:
+                results.append(pd.read_csv(mutationscsv))
+            else:
+                resultpaths[proj] = mutationscsv
+    
+    if aggregate:
+        return pd.concat(results)
 
     mutationcoverage = pd.Series(resultpaths).apply(__combiner)
     mutationcoverage.index.name = 'userName'
