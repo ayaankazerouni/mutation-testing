@@ -16,4 +16,4 @@ WORKDIR ${BASEDIR}
 VOLUME ${PROJDIR}
 VOLUME ${BASEDIR}
 
-CMD ["bash", "-c", "./mujava_runner.py tasks.ndjson > /usr/src/app/mutation-results.ndjson"]
+CMD ["bash", "-c", "./mujava-runner.py tasks.ndjson > /usr/src/app/mutation-results.ndjson"]

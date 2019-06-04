@@ -13,7 +13,7 @@ esac
 [[ -z "$taskfile" ]] && echo 'Missing task file argument (-t|--tasks)' && exit 1
 
 [[ -f $taskfile ]] && \
-  ./clone-projects.py $taskfile -p &&
+  ../clone-projects.py $taskfile -p &&
   docker build \
     --build-arg TASKFILE=$taskfile \
     --build-arg CLONEDIR=$clonedir \
