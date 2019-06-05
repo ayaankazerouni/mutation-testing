@@ -43,10 +43,17 @@ def write_successful(resultpath, n_projects):
         obj = {'projectPath': item}
         print(json.dumps(obj))
 
-def write_all_projects(dirpath):
+def write_all_projects(dirpath, n_projects=None):
     """Write out paths to all projects within the specified dirpath."""
-    for item in os.listdir(dirpath):
-        obj = {'projectPath': os.path.join(dirpath, item)}
+    #for item in os.listdir(dirpath):
+    #    obj = {'projectPath': os.path.join(dirpath, item)}
+    #    print(json.dumps(obj))
+
+    projects=  [itm for itm in os.listdir(dirpath)]
+    if n_projects is not None:
+        projects = random.sample(projects, int(n_projects))
+    for item in projects:
+        obj = {'projectPath': os.path.join(dirpath,item)}
         print(json.dumps(obj))
 
 
@@ -65,9 +72,14 @@ if __name__ == '__main__':
     INFILE = ARGS[0]
     if SUCCESSFUL:
         try:
-            N_PROJECTS = ARGS[1]
+            N_PROJECTS = ARGS[2]
             write_successful(INFILE, N_PROJECTS)
         except IndexError:
             write_successful(INFILE, None)
     else:
-        write_all_projects(INFILE)
+        try:
+            N_PROJECTS = ARGS[2]
+            write_all_projects(INFILE, N_PROJECTS)
+        except IndexError:
+            write_all_projects(INFILE, None)
+

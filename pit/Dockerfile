@@ -27,5 +27,5 @@ VOLUME ${CLONEDIR}
 # directory containing source code and dependencies 
 VOLUME ${BASEDIR}
 
-CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -m deletion > /usr/src/app/mutation-results.ndjson"]
+CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m  all > /usr/src/app/mutation-results.ndjson"]
 

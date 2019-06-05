@@ -29,7 +29,12 @@ def clone_project(projectpath, clonepath, package=True):
         # Move Java files directly under src into src/com/example
         mvcmd = 'mv {javafiles} {package}' \
                 .format(javafiles=os.path.join(clonepath, 'src', '*.java'), package=pkg)
-        subprocess.run(mvcmd, shell=True).check_returncode()
+        try:
+            subprocess.run(mvcmd, shell=True).check_returncode()
+        except subprocess.CalledProcessError as err:
+            #logging.error((projectpath+' did not have files in src//; unable to proceed with this'))
+            pass
+            return
 
         # Add package declaration to the top of Java files
         sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
