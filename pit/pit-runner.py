@@ -36,7 +36,7 @@ import utils
 def main(args):
     """Entry point. Respond to CLI args and trigger execution."""
     loglevel = args.log
-    logging.basicConfig(filename='pit.log', filemode='w', level=loglevel)
+    logging.basicConfig(filename='.log-pit', filemode='w', level=loglevel)
 
     taskfile = args.taskfile
     run(taskfile, args.steps, args.mutators)
