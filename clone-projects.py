@@ -30,7 +30,15 @@ def clone_project(projectpath, clonepath, package=True):
         # Move Java files directly under src into src/com/example
         mvcmd = 'mv {javafiles} {package}' \
                 .format(javafiles=os.path.join(clonepath, 'src', '*.java'), package=pkg)
-        subprocess.run(mvcmd, shell=True).check_returncode()
+        try:
+            result = subprocess.run(mvcmd, shell=True, stdout=subprocess.PIPE, 
+                                    stderr=subprocess.PIPE)
+            result.check_returncode()
+        except:
+            logging.error(('Could not create com.example package structure for '
+                            'project at {}').format(projectpath))
+            if result.stdout: logging.error(result.stdout)
+            if result.stderr: logging.error(result.stderr)
 
         # Add package declaration to the top of Java files
         sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
@@ -47,8 +55,8 @@ def clone_project(projectpath, clonepath, package=True):
                 sys.exit(0)
             else:
                 logging.error('Could not clone project from {}'.format(projectpath))
-                logging.error(result.stdout)
-                logging.error(result.stderr)
+                if result.stdout: logging.error(result.stdout)
+                if result.stderr: logging.error(result.stderr)
 
 if __name__ == '__main__':
     ARGS = sys.argv[1:]
@@ -56,7 +64,7 @@ if __name__ == '__main__':
         print('Error! No args')
         sys.exit(1)
     
-    logging.basicConfig(filename='clone.log', filemode='w', level=logging.WARN)
+    logging.basicConfig(filename='.log-clone', filemode='w', level=logging.WARN)
 
     outerdir = os.path.join('/', 'tmp', 'mutation-testing')
     if os.path.exists(outerdir) and os.path.isdir(outerdir):
