@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import logging
 from shutil import rmtree, copytree
 import subprocess
 
@@ -30,29 +31,40 @@ def clone_project(projectpath, clonepath, package=True):
         mvcmd = 'mv {javafiles} {package}' \
                 .format(javafiles=os.path.join(clonepath, 'src', '*.java'), package=pkg)
         try:
-            subprocess.run(mvcmd, shell=True).check_returncode()
-        except subprocess.CalledProcessError as err:
-            #logging.error((projectpath+' did not have files in src//; unable to proceed with this'))
-            pass
-            return
+            result = subprocess.run(mvcmd, shell=True, stdout=subprocess.PIPE, 
+                                    stderr=subprocess.PIPE)
+            result.check_returncode()
+        except:
+            logging.error(('Could not create com.example package structure for '
+                            'project at {}').format(projectpath))
+            if result.stdout: logging.error(result.stdout)
+            if result.stderr: logging.error(result.stderr)
 
         # Add package declaration to the top of Java files
         sedcmd = 'gsed' if sys.platform == 'darwin' else 'sed' # requires GNU sed on macOS
         sedcmd = sedcmd + " -i '1ipackage com.example;' {javafiles}" \
                 .format(javafiles=os.path.join(pkg, '*.java'))
         try:
-            subprocess.run(sedcmd, shell=True).check_returncode()
+            result = subprocess.run(sedcmd, shell=True, stdin=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            result.check_returncode()
         except subprocess.CalledProcessError as err:
             if err.returncode == 127 and sys.platform == 'darwin':
                 logging.error(('If you are on macOS, please install the GNU '
                                'sed extension "gsed". To install: brew install gsed'))
-            sys.exit(0)
+                sys.exit(0)
+            else:
+                logging.error('Could not clone project from {}'.format(projectpath))
+                if result.stdout: logging.error(result.stdout)
+                if result.stderr: logging.error(result.stderr)
 
 if __name__ == '__main__':
     ARGS = sys.argv[1:]
     if not ARGS:
         print('Error! No args')
         sys.exit(1)
+    
+    logging.basicConfig(filename='.log-clone', filemode='w', level=logging.WARN)
 
     outerdir = os.path.join('/', 'tmp', 'mutation-testing')
     if os.path.exists(outerdir) and os.path.isdir(outerdir):
