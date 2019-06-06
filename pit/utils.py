@@ -28,7 +28,7 @@ def get_mutation_coverage(resultspath):
 
             return result
     except FileNotFoundError:
-        print("Couldn't find output")
+        #print("Couldn't find output")
         pass
 
     return None
