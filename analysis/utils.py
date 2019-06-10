@@ -9,7 +9,7 @@ import pandas as pd
 modulepath = os.path.expanduser(os.path.join('~', 'Developer'))
 if os.path.exists(modulepath) and modulepath not in sys.path:
     sys.path.append(modulepath)
-from sensordata import consolidate_sensordata
+from sensordata import load_datasets   
 
 pit_results_path = os.path.join(modulepath, 'mutation-testing', 'data', 'icer-2019', 'pit')
 pit_mutations_path = os.path.join(pit_results_path, 'mutations.csv')
@@ -44,7 +44,7 @@ def getsubmissions(webcat_path, assignments, users=None):
     q = 'assignment in @assignments'
     if users is not None:
         q = 'userName in @users and ' + q
-    submissions = consolidate_sensordata \
+    submissions = load_datasets \
             .load_submission_data(webcat_path, pluscols=pluscols) \
             .reset_index() \
             .query(q)
@@ -53,14 +53,15 @@ def getsubmissions(webcat_path, assignments, users=None):
             'elementsCovered', 'conditionals.nontest']
     return submissions[cols].set_index('userName')
 
-def get_mutator_specific_data(pit_mutations=None, submissions=None):
+def get_mutator_specific_data(pit_mutations=None, submissions=None, **kwargs):
     """Get characteristics of individual mutation operators, for each project."""
     if pit_mutations is None:
         pit_mutations = pd.read_csv(pit_mutations_path)
 
     if submissions is None:
+        assignments = kwargs.get('assignments', ['Project 2'])
         submissions = getsubmissions(webcat_path=webcat_path, users=pit_mutations.userName.unique(),
-                                     assignments=['Project 2'])
+                                     assignments=assignments)
     pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name)
     return pit_mutations.groupby(['userName', 'mutator']).apply(__mutator_specific_data_helper, submissions)
 
@@ -92,7 +93,7 @@ def get_running_time(resultfile):
             results[username] = runningtime
     return pd.Series(results)
 
-def get_main_subset_data(mutators, submissions):
+def get_main_subset_data(mutators, submissions, running_time_paths=None):
     """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
     
     Args:
@@ -116,23 +117,23 @@ def get_main_subset_data(mutators, submissions):
                      .merge(right=sufficient, right_index=True, left_index=True) \
                      .merge(right=full, right_index=True, left_index=True) \
                      .merge(right=reduced_subset1, right_index=True, left_index=True)
-    
-    # main subsets
-    for filename in os.listdir(pit_results_path):
-        name, ext = os.path.splitext(filename)
-        if ext != '.ndjson':
-            continue
-        
+    if running_time_paths:
         # main subsets
-        if  name.startswith('pit'):
-            subset = name.split('-')[1]
-        elif name.startswith('inc'):
-            subset = ''.join(name.split('-')[:2])
-        else: 
-            continue
+        for filename in os.listdir(pit_results_path):
+            name, ext = os.path.splitext(filename)
+            if ext != '.ndjson':
+                continue
+            
+            # main subsets
+            if  name.startswith('pit'):
+                subset = name.split('-')[1]
+            elif name.startswith('inc'):
+                subset = ''.join(name.split('-')[:2])
+            else: 
+                continue
 
-        filepath = os.path.join(pit_results_path, filename)
-        joined['{}_runningtime'.format(subset)] = get_running_time(resultfile=filepath)
+            filepath = os.path.join(pit_results_path, filename)
+            joined['{}_runningtime'.format(subset)] = get_running_time(resultfile=filepath)
     
     return joined
 
