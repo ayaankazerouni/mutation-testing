@@ -39,9 +39,9 @@ def main(args):
     logging.basicConfig(filename='.log-pit', filemode='w', level=loglevel)
 
     taskfile = args.taskfile
-    run(taskfile, args.steps, args.mutators)
+    run(taskfile, args.steps, args.mutators, args.targetclasses)
 
-def run(taskfile, steps=False, mutators='all'):
+def run(taskfile, steps=False, mutators='all', targetclasses=None):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
@@ -52,16 +52,17 @@ def run(taskfile, steps=False, mutators='all'):
     """
     with open(taskfile) as infile:
         for line in infile:
-            __run_for_project(line, steps, mutators)
+            __run_for_project(line, steps, mutators, targetclasses)
 
-def __run_for_project(task, steps, mutators):
+def __run_for_project(task, steps, mutators, targetclasses):
     opts = json.loads(task)
     projectpath = opts['projectPath']
     logging.info('Starting for %s', projectpath)
     runner = MutationRunner(
         projectpath=projectpath,
         steps=steps,
-        mutators=mutators
+        mutators=mutators,
+        targetclasses=targetclasses
     )
     mutationoutput = runner.testsingleproject()
     if not steps:
@@ -167,7 +168,7 @@ class MutationRunner:
     ]
 
     def __init__(self, projectpath, antpath=None, libpath=None,
-                 steps=False, mutators='all'):
+                 steps=False, mutators='all', targetclasses=''):
         self.projectpath = os.path.normpath(os.path.expanduser(projectpath))
         self.projectname = os.path.basename(self.projectpath)
         self.clonepath = os.path.join('/tmp/mutation-testing', self.projectname, '')
@@ -187,6 +188,8 @@ class MutationRunner:
             else:
                 raise ValueError(('Use keywords all, deletion, default, sufficient, '
                                 'or a comma-separated valid set of mutation operators'))
+        
+        self.targetclasses = targetclasses
 
         cwd = os.getcwd()
         self.antpath = antpath or os.path.join(cwd, 'build.xml')
@@ -248,14 +251,18 @@ class MutationRunner:
         return results
 
     def __mutate(self, mutators, pitreports):
-        targetclasses, targettests = self.getpittargets()
+        if self.targetclasses:
+            _, targettests = self.getpittargets()
+        else:
+            self.targetclasses, targettests = self.getpittargets()
+
         antcmd = ('ant -f {} -Dbasedir={} -Dresource_dir={} -Dtarget_classes={} '
                   '-Dtarget_tests={} -Dmutators={} -Dpit_reports={} pit') \
                   .format(
                       self.antpath,
                       self.clonepath,
                       self.libpath,
-                      targetclasses,
+                      self.targetclasses,
                       targettests,
                       mutators,
                       pitreports
@@ -275,7 +282,7 @@ class MutationRunner:
         src = os.path.join(self.clonepath, 'src', '')
         targetclasses = []
         targettests = []
-
+        
         # finds Java source files recursively
         for root, _, files in os.walk(src):
             if files:
@@ -304,9 +311,14 @@ if __name__ == '__main__':
                         help=('set of mutators to run: one of [all|default|deletion|sufficient] or '
                             'a list of comma-separated mutator names, as seen in the PIT documentation.'
                             ' Defaults to "deletion".'))
+    parser.add_argument('-c', '--targetclasses', default=None,
+                        help=('set of Java package globs to mutate: '
+                            'a list of comma-separated values '
+                            'Defaults to an empty string.'))
     if sys.argv[1:]:
         args = parser.parse_args()
         main(args)
     else:
         print('Error! No args')
         parser.print_help()
+
