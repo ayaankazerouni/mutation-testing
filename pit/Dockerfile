@@ -19,13 +19,12 @@ RUN \
   python3 -m pip install pandas && \
   rm -rf /var/lib/apt/lists/*;
 
-WORKDIR ${BASEDIR}
-
-# directory that will contain projects prepared for PIT testing
 VOLUME ${CLONEDIR}
 
 # directory containing source code and dependencies 
 VOLUME ${BASEDIR}
 
-CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m deletion > /usr/src/app/mutation-results.ndjson"]
+# directory that will contain projects prepared for PIT testing
+WORKDIR ${BASEDIR}
 
+CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all > /usr/src/app/mutation-results.ndjson"]
