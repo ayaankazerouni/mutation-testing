@@ -18,3 +18,5 @@ data/
 
 *.log
 nohup.out
+
+run-autom*.sh
