@@ -275,6 +275,8 @@ class MutationRunner:
         src = os.path.join(self.clonepath, 'src', '')
         targetclasses = []
         targettests = []
+
+        # finds Java source files recursively
         for root, _, files in os.walk(src):
             if files:
                 packagename = root.replace(src, '').replace(os.sep, '.')

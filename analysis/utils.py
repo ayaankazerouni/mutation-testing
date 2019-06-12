@@ -9,7 +9,7 @@ import pandas as pd
 modulepath = os.path.expanduser(os.path.join('~', 'Developer'))
 if os.path.exists(modulepath) and modulepath not in sys.path:
     sys.path.append(modulepath)
-from sensordata import consolidate_sensordata
+from sensordata import load_datasets   
 
 pit_results_path = os.path.join(modulepath, 'mutation-testing', 'data', 'icer-2019', 'pit')
 pit_mutations_path = os.path.join(pit_results_path, 'mutations.csv')
@@ -37,39 +37,63 @@ pit_default = [
     'VoidMethodCall'
 ]
 
-def getsubmissions(webcat_path, assignments, users=None): 
+pit_full = [
+    'ABS',
+    'AOD',
+    'AOR',
+    'BooleanFalseReturnVals',
+    'BooleanTrueReturnVals',
+    'CRCR',
+    'ConditionalsBoundary',
+    'ConstructorCall',
+    'EmptyObjectReturnVals',
+    'Increments',
+    'InlineConstant',
+    'Math',
+    'NegateConditionals',
+    'NonVoidMethodCall',
+    'PrimitiveReturns',
+    'ROR',
+    'RemoveConditional',
+    'ReturnVals',
+    'UOI',
+    'VoidMethodCall'
+]
+
+def getsubmissions(webcat_path, keepassignments=[], users=None): 
     """Get Web-CAT submissions for the specified users on the specified assignments.""" 
     pluscols = ['statements', 'statements.test', 'statements.nontest', 
                 'methods.test', 'methods.nontest', 'conditionals.nontest']
-    q = 'assignment in @assignments'
+    submissions = load_datasets.load_submission_data(webcat_path, pluscols=pluscols, 
+                    keepassignments=keepassignments).reset_index()
     if users is not None:
-        q = 'userName in @users and ' + q
-    submissions = consolidate_sensordata \
-            .load_submission_data(webcat_path, pluscols=pluscols) \
-            .reset_index() \
-            .query(q)
-    cols = ['userName', 'score', 'methods.test', 'methods.nontest', 
-            'statements', 'statements.test', 'statements.nontest', 
-            'elementsCovered', 'conditionals.nontest']
-    return submissions[cols].set_index('userName')
+        submissions = submissions.query('userName in @users')
+    cols = ['userName', 'assignment', 'score', 'methods.test', 'methods.nontest', 'statements', 
+            'statements.test', 'statements.nontest', 'elementsCovered', 'conditionals.nontest']
+    return submissions[cols].set_index(['userName', 'assignment'])
 
-def get_mutator_specific_data(pit_mutations=None, submissions=None):
+def get_mutator_specific_data(pit_mutations=None, submissions=None, **kwargs):
     """Get characteristics of individual mutation operators, for each project."""
     if pit_mutations is None:
         pit_mutations = pd.read_csv(pit_mutations_path)
 
     if submissions is None:
-        submissions = getsubmissions(webcat_path=webcat_path, users=pit_mutations.userName.unique(),
-                                     assignments=['Project 2'])
+        assignments = kwargs.get('assignments', ['Project 2'])
+        subpath = kwargs.get('webcat_path', webcat_path)
+        submissions = getsubmissions(webcat_path=subpath, users=pit_mutations.userName.unique(),
+                                     assignments=assignments)
     pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name)
-    return pit_mutations.groupby(['userName', 'mutator']).apply(__mutator_specific_data_helper, submissions)
+    return pit_mutations.groupby(['userName', 'assignment', 'mutator']).apply(__mutator_specific_data_helper, submissions)
 
-def __mutator_specific_data_helper(mutations, joined):
-    username, _ = mutations.name
+def __mutator_specific_data_helper(mutations, submissions):
+    username, assignment, _ = mutations.name
+    if (username, assignment) not in submissions.index:
+        return None
+
     total = mutations.shape[0]
     survived = mutations.query('killed == "SURVIVED"').shape[0]
     killed = total - survived
-    loc = joined.loc[username, 'statements.nontest']
+    loc = submissions.loc[(username, assignment), 'statements.nontest']
     survival = survived / total
     mpl = total / loc
     return pd.Series({
@@ -84,7 +108,7 @@ def __mutator_specific_data_helper(mutations, joined):
 def get_running_time(resultfile):
     """Get running time from the NDJSON file at `resultfile`."""
     results = {}
-    with open(os.path.join(pit_results_path, resultfile)) as infile:
+    with open(os.path.abspath(resultfile)) as infile:
         for line in infile:
             result = json.loads(line)
             username = os.path.basename(result['projectPath'])
@@ -92,7 +116,7 @@ def get_running_time(resultfile):
             results[username] = runningtime
     return pd.Series(results)
 
-def get_main_subset_data(mutators, submissions):
+def get_main_subset_data(mutators, submissions, running_time_paths=None):
     """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
     
     Args:
@@ -100,6 +124,8 @@ def get_main_subset_data(mutators, submissions):
                                  `get_mutator_specific_data`
         submissions (pd.DataFrame): Submission data for student projects, as 
                                     returned by `getsubmissions`
+        running_time_paths (str): Paths to ndjson files containing running time information
+                                  for the main subsets 
     
     Returns:
         A DataFrame containing columns {subset}_cov, {subset}_surv, {subset}_mpl, 
@@ -110,29 +136,27 @@ def get_main_subset_data(mutators, submissions):
     sufficient = get_data_for_subset(mutators, submissions=submissions, subset=pit_sufficient, 
                                      prefix='sufficient')
     full = get_data_for_subset(mutators, submissions=submissions, prefix='full')
-    subset1 = ['RemoveConditional', 'BooleanTrueReturnVals', 'ConstructorCall']
-    reduced_subset1 = get_data_for_subset(mutators, subset=subset1, submissions=submissions, prefix='subset1')
     joined = deletion.merge(right=default, right_index=True, left_index=True) \
                      .merge(right=sufficient, right_index=True, left_index=True) \
-                     .merge(right=full, right_index=True, left_index=True) \
-                     .merge(right=reduced_subset1, right_index=True, left_index=True)
-    
-    # main subsets
-    for filename in os.listdir(pit_results_path):
-        name, ext = os.path.splitext(filename)
-        if ext != '.ndjson':
-            continue
-        
-        # main subsets
-        if  name.startswith('pit'):
-            subset = name.split('-')[1]
-        elif name.startswith('inc'):
-            subset = ''.join(name.split('-')[:2])
-        else: 
-            continue
+                     .merge(right=full, right_index=True, left_index=True)
 
-        filepath = os.path.join(pit_results_path, filename)
-        joined['{}_runningtime'.format(subset)] = get_running_time(resultfile=filepath)
+    if running_time_paths:
+        # main subsets
+        for filename in os.listdir(pit_results_path):
+            name, ext = os.path.splitext(filename)
+            if ext != '.ndjson':
+                continue
+            
+            # main subsets
+            if  name.startswith('pit'):
+                subset = name.split('-')[1]
+            elif name.startswith('inc'):
+                subset = ''.join(name.split('-')[:2])
+            else: 
+                continue
+
+            filepath = os.path.join(pit_results_path, filename)
+            joined['{}_runningtime'.format(subset)] = get_running_time(resultfile=filepath)
     
     return joined
 
@@ -152,10 +176,11 @@ def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
     df = df.reset_index()
     if subset is not None:
         df = df.query('mutator in @subset')
-    return df.groupby('userName').apply(aggregate_data, submissions, prefix)
+    return df.groupby(['userName', 'assignment']) \
+             .apply(aggregate_data, submissions, prefix)
 
 def aggregate_data(df, submissions=None, prefix=''):
-    username = df.name
+    idx = df.name
     
     if prefix:
         prefix = '{}_'.format(prefix)
@@ -169,8 +194,8 @@ def aggregate_data(df, submissions=None, prefix=''):
         '{}surv'.format(prefix): surv
     }
     
-    if submissions is not None:
-        loc = submissions.loc[username, 'statements.nontest']
+    if submissions is not None and idx in submissions.index:
+        loc = submissions.loc[idx, 'statements.nontest']
         mpl = num / loc
         efficiency = surv / mpl
         result['{}eff'.format(prefix)] = efficiency
@@ -183,8 +208,7 @@ def all_mutator_data(mutators, measure):
     
     Use to format things for modelling.
     """ 
-    return mutators[measure].reset_index() \
-                            .pivot(index='userName', columns='mutator', values=measure)
+    return mutators[measure].unstack()
 
 def factorisedsubsets(df, dv):
     """Return a DataFrame with the operator subset as a factor. Use the result
