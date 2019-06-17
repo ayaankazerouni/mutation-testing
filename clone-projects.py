@@ -2,10 +2,17 @@
 """Simple utility for cloning projects for mutation testing."""
 import os
 import sys
+import glob
 import json
 import logging
 from shutil import rmtree, copytree
 import subprocess
+
+def remove_non_ascii(filepath):
+    cmd = "perl -pi -e 's/[^[:ascii:]]//g' {}".format(filepath)
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    result.check_returncode()
 
 def clone_project(projectpath, clonepath, package=True):
     """Copy the project at projectpath to the specified clonepath.
@@ -21,6 +28,10 @@ def clone_project(projectpath, clonepath, package=True):
     if os.path.exists(clonepath) and os.path.isdir(clonepath):
         rmtree(clonepath)
     copytree(projectpath, clonepath)
+    
+    javafiles = glob.glob(os.path.join(clonepath, '**', '*.java'), recursive=True)
+    for filepath in javafiles:
+        remove_non_ascii(filepath)
     
     if package:
         # Create com.example package structure
