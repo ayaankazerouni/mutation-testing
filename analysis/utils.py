@@ -176,8 +176,12 @@ def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
     df = df.reset_index()
     if subset is not None:
         df = df.query('mutator in @subset')
-    return df.groupby(['userName', 'assignment']) \
-             .apply(aggregate_data, submissions, prefix)
+    result = df.groupby(['userName', 'assignment']) \
+               .apply(aggregate_data, submissions, prefix)
+    if isinstance(result, pd.Series):
+        result = result.unstack()
+
+    return result
 
 def aggregate_data(df, submissions=None, prefix=''):
     idx = df.name
@@ -207,6 +211,9 @@ def all_mutator_data(mutators, measure):
     """Get a specific characteristic of all mutators.
     
     Use to format things for modelling.
+
+    Args:
+        mutators (pd.DataFrame): A DataFrame as returned by :meth:`get_mutator_specific_data`
     """ 
     return mutators[measure].unstack()
 
@@ -248,6 +255,4 @@ def __clean_mutator_name(name):
             name = 'RemoveConditional'
     name = name.split('Mutator')[0]
     return name
-
-# mutdata.to_csv(os.path.join(pit_results_path, 'overall_results.csv'), index=True)
 
