@@ -22,6 +22,7 @@
     <pathelement location="${resource_dir}/CarranoDataStructures.jar" />
     <pathelement location="${resource_dir}/GraphWindow.jar" />
     <pathelement location="${resource_dir}/BSTstudent-provided.jar"/>
+    <pathelement location="${resource_dir}/bsh.jar" />
     <pathelement location="${bin_dir}"/>
   </path>
 
