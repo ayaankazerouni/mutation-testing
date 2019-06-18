@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import json
+import glob
 
 import pandas as pd
 
@@ -10,10 +11,6 @@ modulepath = os.path.expanduser(os.path.join('~', 'Developer'))
 if os.path.exists(modulepath) and modulepath not in sys.path:
     sys.path.append(modulepath)
 from sensordata import load_datasets   
-
-pit_results_path = os.path.join(modulepath, 'mutation-testing', 'data', 'icer-2019', 'pit')
-pit_mutations_path = os.path.join(pit_results_path, 'mutations.csv')
-webcat_path = os.path.join(modulepath, 'sensordata', 'data', 'fall-2016', 'web-cat-3114-fall-2016.csv')
 
 pit_deletion = [
     'RemoveConditional',
@@ -72,11 +69,8 @@ def getsubmissions(webcat_path, keepassignments=[], users=None):
             'statements.test', 'statements.nontest', 'elementsCovered', 'conditionals.nontest']
     return submissions[cols].set_index(['userName', 'assignment'])
 
-def get_mutator_specific_data(pit_mutations=None, submissions=None, **kwargs):
+def get_mutator_specific_data(pit_mutations, submissions=None, **kwargs):
     """Get characteristics of individual mutation operators, for each project."""
-    if pit_mutations is None:
-        pit_mutations = pd.read_csv(pit_mutations_path)
-
     if submissions is None:
         assignments = kwargs.get('assignments', ['Project 2'])
         subpath = kwargs.get('webcat_path', webcat_path)
@@ -116,7 +110,7 @@ def get_running_time(resultfile):
             results[username] = runningtime
     return pd.Series(results)
 
-def get_main_subset_data(mutators, submissions, running_time_paths=None):
+def get_main_subset_data(mutators, submissions):
     """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
     
     Args:
@@ -124,8 +118,6 @@ def get_main_subset_data(mutators, submissions, running_time_paths=None):
                                  `get_mutator_specific_data`
         submissions (pd.DataFrame): Submission data for student projects, as 
                                     returned by `getsubmissions`
-        running_time_paths (str): Paths to ndjson files containing running time information
-                                  for the main subsets 
     
     Returns:
         A DataFrame containing columns {subset}_cov, {subset}_surv, {subset}_mpl, 
@@ -140,24 +132,6 @@ def get_main_subset_data(mutators, submissions, running_time_paths=None):
                      .merge(right=sufficient, right_index=True, left_index=True) \
                      .merge(right=full, right_index=True, left_index=True)
 
-    if running_time_paths:
-        # main subsets
-        for filename in os.listdir(pit_results_path):
-            name, ext = os.path.splitext(filename)
-            if ext != '.ndjson':
-                continue
-            
-            # main subsets
-            if  name.startswith('pit'):
-                subset = name.split('-')[1]
-            elif name.startswith('inc'):
-                subset = ''.join(name.split('-')[:2])
-            else: 
-                continue
-
-            filepath = os.path.join(pit_results_path, filename)
-            joined['{}_runningtime'.format(subset)] = get_running_time(resultfile=filepath)
-    
     return joined
 
 def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
