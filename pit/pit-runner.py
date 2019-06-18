@@ -287,6 +287,11 @@ class MutationRunner:
         for root, _, files in os.walk(src):
             if files:
                 packagename = root.replace(src, '').replace(os.sep, '.')
+                # TODO: Change following line and signature to exclude files
+                # matching a certain condition: pass function pointer as
+                # parameter. If none, include all classes. Else, exclude
+                # the ones returned as true
+
                 targetclasses.append('{}.*'.format(packagename))
                 targettests.append('{}.*Test*'.format(packagename))
 
