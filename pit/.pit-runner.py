@@ -39,9 +39,9 @@ def main(args):
     logging.basicConfig(filename='.log-pit', filemode='w', level=loglevel)
 
     taskfile = args.taskfile
-    run(taskfile, args.steps, args.mutators, args.targetclasses, args.excludetargetclasses, args.excludetargettests)
+    run(taskfile, args.steps, args.mutators, args.targetclasses)
 
-def run(taskfile, steps=False, mutators='all', targetclasses=None, exclude_class=None, exclude_test=None):
+def run(taskfile, steps=False, mutators='all', targetclasses=None):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
@@ -52,9 +52,9 @@ def run(taskfile, steps=False, mutators='all', targetclasses=None, exclude_class
     """
     with open(taskfile) as infile:
         for line in infile:
-            __run_for_project(line, steps, mutators, targetclasses, exclude_class, exclude_test)
+            __run_for_project(line, steps, mutators, targetclasses)
 
-def __run_for_project(task, steps, mutators, targetclasses, exclude_class, exclude_test):
+def __run_for_project(task, steps, mutators, targetclasses):
     opts = json.loads(task)
     projectpath = opts['projectPath']
     logging.info('Starting for %s', projectpath)
@@ -62,9 +62,7 @@ def __run_for_project(task, steps, mutators, targetclasses, exclude_class, exclu
         projectpath=projectpath,
         steps=steps,
         mutators=mutators,
-        targetclasses=targetclasses,
-        exclude_class=exclude_class,
-        exclude_test=exclude_test
+        targetclasses=targetclasses
     )
     mutationoutput = runner.testsingleproject()
     if not steps:
@@ -168,44 +166,9 @@ class MutationRunner:
         'ROR',
         'UOI'
     ]
-    
-    #Defining exclusion rules
-    def __check_class_gui_window(filename):
-        if not "java" in filename:
-            # Default rule: if the file is not a java file, exclude it from testing
-            return True
-        if "GUI" in filename or "Window" in filename or "Test" in filename:
-            return True
-        #Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
-        return False
-    
-    def __check_test_InputReference(filename):
-        if not "java" in filename:
-            # Default rule: if the file is not a java file, exclude it from testing
-            return True
-        if "Test" in filename:
-            if "InputReference" in filename:
-                return True
-            else:
-                return False
-        #Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
-        return True
-
-    exclusion_class_rules = {
-            None: None,
-            "p5-excludeGUI": __check_class_gui_window,
-            "excludeGUI": __check_class_gui_window
-    }
-
-    exclusion_test_rules = {
-            None: None,
-            "p5-excludeInputReference":__check_test_InputReference,
-            "excludeInputReference":__check_test_InputReference
-    }
 
     def __init__(self, projectpath, antpath=None, libpath=None,
-                 steps=False, mutators='all', targetclasses='',
-                 exclude_class=None, exclude_test=None):
+                 steps=False, mutators='all', targetclasses=''):
         self.projectpath = os.path.normpath(os.path.expanduser(projectpath))
         self.projectname = os.path.basename(self.projectpath)
         self.clonepath = os.path.join('/tmp/mutation-testing', self.projectname, '')
@@ -227,8 +190,6 @@ class MutationRunner:
                                 'or a comma-separated valid set of mutation operators'))
         
         self.targetclasses = targetclasses
-        self.exclusion_class_rule = self.exclusion_class_rules[exclude_class]
-        self.exclusion_test_rule  = self.exclusion_test_rules[exclude_test]
 
         cwd = os.getcwd()
         self.antpath = antpath or os.path.join(cwd, 'build.xml')
@@ -280,12 +241,12 @@ class MutationRunner:
                               self.projectname, mutator)
                 results[mutator] = (None, result, runningtime)
             else:
-                 coveragecsv = os.path.join(pitreports, 'mutations.csv')
-                 coverage = utils.get_mutation_coverage(coveragecsv)
-                 if coverage is None:
+                coveragecsv = os.path.join(pitreports, 'mutations.csv')
+                coverage = utils.get_mutation_coverage(coveragecsv)
+                if coverage is None:
                     results[mutator] = (None, result, runningtime)
-                 else:
-                     results[mutator] = (coverage['mutationCovered'], result, runningtime)
+                else:
+                    results[mutator] = (coverage['mutationCovered'], result, runningtime)
             logging.info('%s: Finished mutating with %s', self.projectname, mutator)
         return results
 
@@ -326,19 +287,13 @@ class MutationRunner:
         for root, _, files in os.walk(src):
             if files:
                 packagename = root.replace(src, '').replace(os.sep, '.')
-                if not self.exclusion_class_rule:
-                    targetclasses.append('{}.*'.format(packagename))
-                else:
-                    for filename in files:
-                        if not self.exclusion_class_rule(filename):
-                            targetclasses.append('{}.{}'.format(packagename,filename.replace(src, '').replace(os.sep, '.').replace('.java','')))
+                # TODO: Change following line and signature to exclude files
+                # matching a certain condition: pass function pointer as
+                # parameter. If none, include all classes. Else, exclude
+                # the ones returned as true
 
-                if not self.exclusion_test_rule:
-                    targettests.append('{}.*Test*'.format(packagename))
-                else:
-                    for filename in files:
-                        if not self.exclusion_test_rule(filename):
-                            targettests.append('{}.{}'.format(packagename,filename.replace(src, '').replace(os.sep, '.').replace('.java','')))
+                targetclasses.append('{}.*'.format(packagename))
+                targettests.append('{}.*Test*'.format(packagename))
 
         targetclasses = ','.join(targetclasses)
         targettests = ','.join(targettests)
@@ -365,14 +320,6 @@ if __name__ == '__main__':
                         help=('set of Java package globs to mutate: '
                             'a list of comma-separated values '
                             'Defaults to an empty string.'))
-    parser.add_argument('-e', '--excludetargetclasses', default=None,
-                        help=('Name of rule for excluding families of classes from target classes, associated with a function name in MutationRunner'
-                            'a single string name, '
-                            'Defaults to None, in which case target classes are determined by --targetclasses option'))
-    parser.add_argument('-t', '--excludetargettests', default=None,
-                        help=('Name of rule for excluding families of test classes from target tests, associated with a function name in MutationRunner'
-                            'a single string name, '
-                            'Defaults to None, in which case all target tests are selected'))
     if sys.argv[1:]:
         args = parser.parse_args()
         main(args)

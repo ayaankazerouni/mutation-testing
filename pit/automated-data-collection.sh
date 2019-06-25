@@ -16,6 +16,7 @@ cd /tmp/mutation-testing/
 find . -name 'mutations.csv' -exec cp --parents \{\} $2 \;
 
 mv ~/code/forked/mutation-testing/pit/mutation-results.ndjson $2
+mv ~/code/forked/mutation-testing/pit/.log-pit $2/log-pit.txt
 
 tar -czvf $2.tar.gz -C $2 ./
 rm -rf $2
