@@ -14,7 +14,6 @@ esac
 
 [[ -f $taskfile ]] && \
   ../clone-projects.py $taskfile -p &&
-  #../clone-projects.py $taskfile &&
   docker build \
     --build-arg TASKFILE=$taskfile \
     --build-arg CLONEDIR=$clonedir \
