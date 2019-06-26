@@ -3,7 +3,6 @@ outputdirname=$2 #path starting in outputs; such as fall2018/p1
 
 #Sanity check; change the directory to parent of pit/
 cd ~/code/forked/mutation-testing
-#./write_tasks.py $1 -n 4 > pit/tasks.ndjson
 ./write_tasks.py $1 > pit/tasks.ndjson
 
 #Change directory to pit/ and run docker container
