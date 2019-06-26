@@ -1,6 +1,7 @@
 */projects/*
 *.ipynb
 !subset_analysis.ipynb
+!static_analysis.ipynb
 .ipynb_checkpoints
 __pycache__/
 sandbox.py

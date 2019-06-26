@@ -18,12 +18,15 @@ pit_deletion = [
     'NonVoidMethodCall',
     'ConstructorCall',
     'BooleanTrueReturnVals',
-    'BooleanFalseReturnVals',
-    'PrimitiveReturns',
     'EmptyObjectReturnVals'
 ]
 
-pit_sufficient = ['ABS', 'ROR', 'AOD', 'UOI']
+pit_sufficient = [
+        'ABS', 
+        'ROR',
+        'AOR',
+        'UOI'
+    ]
 
 pit_default = [
     'ConditionalsBoundary',
@@ -37,21 +40,17 @@ pit_default = [
 pit_full = [
     'ABS',
     'AOD',
-    'AOR',
-    'BooleanFalseReturnVals',
+    'AOR2', 'AOR3', 'AOR4',
     'BooleanTrueReturnVals',
     'CRCR',
-    'ConditionalsBoundary',
+    'RemoveConditional',
     'ConstructorCall',
     'EmptyObjectReturnVals',
     'Increments',
     'InlineConstant',
     'Math',
-    'NegateConditionals',
     'NonVoidMethodCall',
-    'PrimitiveReturns',
     'ROR',
-    'RemoveConditional',
     'ReturnVals',
     'UOI',
     'VoidMethodCall'
@@ -63,6 +62,8 @@ def getsubmissions(webcat_path, keepassignments=[], users=None):
                 'methods.test', 'methods.nontest', 'conditionals.nontest']
     submissions = load_datasets.load_submission_data(webcat_path, pluscols=pluscols, 
                     keepassignments=keepassignments).reset_index()
+    submissions['assignment'] = submissions['assignment'] \
+            .apply(lambda a: re.search(r'Project \d', a).group())
     if users is not None:
         submissions = submissions.query('userName in @users')
     cols = ['userName', 'assignment', 'score', 'methods.test', 'methods.nontest', 'statements', 
@@ -88,15 +89,12 @@ def __mutator_specific_data_helper(mutations, submissions):
     survived = mutations.query('killed == "SURVIVED"').shape[0]
     killed = total - survived
     loc = submissions.loc[(username, assignment), 'statements.nontest']
-    survival = survived / total
     mpl = total / loc
     return pd.Series({
         'num': total,
         'killed': killed,
         'cov': killed / total,
-        'surv': survived / total,
-        'mpl': mpl,
-        'eff': survival / mpl
+        'mpl': mpl
     })
 
 def get_running_time(resultfile):
@@ -127,7 +125,7 @@ def get_main_subset_data(mutators, submissions):
     default = get_data_for_subset(mutators, submissions=submissions, subset=pit_default, prefix='default')
     sufficient = get_data_for_subset(mutators, submissions=submissions, subset=pit_sufficient, 
                                      prefix='sufficient')
-    full = get_data_for_subset(mutators, submissions=submissions, prefix='full')
+    full = get_data_for_subset(mutators, submissions=submissions, subset=pit_full, prefix='full')
     joined = deletion.merge(right=default, right_index=True, left_index=True) \
                      .merge(right=sufficient, right_index=True, left_index=True) \
                      .merge(right=full, right_index=True, left_index=True)
@@ -139,6 +137,7 @@ def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
     Acts on data as returned by `get_mutator_specific_data`.
     
     Args:
+        df (pd.DataFrame): Mutator specific data
         subset (list): A list of mutation operators
         submissions (pd.DataFrame): Web-CAT submissions. Required for
                                     efficiency and mutants per loc
@@ -149,7 +148,8 @@ def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
     """
     df = df.reset_index()
     if subset is not None:
-        df = df.query('mutator in @subset')
+        r = '|'.join(['^{}'.format(m) for m in subset])
+        df = df[df.mutator.str.match(r)]
     result = df.groupby(['userName', 'assignment']) \
                .apply(aggregate_data, submissions, prefix)
     if isinstance(result, pd.Series):
@@ -165,18 +165,14 @@ def aggregate_data(df, submissions=None, prefix=''):
     
     num = df['num'].sum()
     cov = df['killed'].sum() / num
-    surv = 1 - cov
     result = {
         '{}num'.format(prefix): num,
         '{}cov'.format(prefix): cov,
-        '{}surv'.format(prefix): surv
     }
     
     if submissions is not None and idx in submissions.index:
         loc = submissions.loc[idx, 'statements.nontest']
         mpl = num / loc
-        efficiency = surv / mpl
-        result['{}eff'.format(prefix)] = efficiency
         result['{}mpl'.format(prefix)] = mpl
     
     return pd.Series(result)
@@ -218,15 +214,12 @@ def __clean_subset_name(n):
 
 def __clean_mutator_name(name):
     """Sanitise mutation operator names."""
-    # some mutants are prefixed and have subtypes, e.g., AOR1Mutator, CRCR5Mutator, etc.
-    prefixes = ['AOR', 'AOD', 'ROR', 'UOI', 'OBBN', 'CRCR', 'RemoveConditional']
+    prefixes = ['AOD', 'ROR', 'UOI', 'OBBN', 'CRCR']
     name = name.split('.')[-1]
-    if any([name.startswith(x) for x in prefixes]):
-        match = re.match(r'^(\w+)\d+', name)
+    name = name.split('Mutator')[0]
+    if name in prefixes:
+        match = re.match(r'^(\w+)\d$', name)
         if match:
             name = match.groups()[0]
-        else:
-            name = 'RemoveConditional'
-    name = name.split('Mutator')[0]
     return name
 
