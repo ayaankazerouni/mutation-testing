@@ -193,24 +193,22 @@ def mutator_coverage_for_subset(mutators, subset=None):
         mutators (pd.DataFrame): A DataFrame as returned by :meth:`get_mutator_specific_data`
     """
     mutators = mutators.reset_index()
-    coverages = mutators.groupby(['userName', 'assignment']).apply(get_coverage_for_mutators)
-
-    if subset:
-        return coverages[subset]
+    coverages = mutators.groupby(['userName', 'assignment']).apply(get_coverage_for_mutators, subset=subset)
 
     return coverages 
 
-def get_coverage_for_mutators(df):
-	covs = {}
-	done = []
-	for item in pit_full:
-		op = re.match(r'([a-zA-Z]+)\d*', item).groups()[0]
-		if op in done:
-			continue
-		opdata = df[df.mutator.str.match(r'^{}'.format(op))]
-		covs[op] = opdata['killed'].sum() / opdata['num'].sum()
-		done.append(op)
-	return pd.Series(covs)
+def get_coverage_for_mutators(df, subset=None):
+    covs = {}
+    done = []
+    subset = subset or pit_full
+    for item in subset:
+        op = re.match(r'([a-zA-Z]+)\d*', item).groups()[0]
+        if op in done:
+            continue
+        opdata = df[df.mutator.str.match(r'^{}'.format(op))]
+        covs[op] = opdata['killed'].sum() / opdata['num'].sum()
+        done.append(op)
+    return pd.Series(covs)
 
 def factorisedsubsets(df, dv):
     """Return a DataFrame with the operator subset as a factor. Use the result
@@ -247,4 +245,45 @@ def __clean_mutator_name(name):
         if match:
             name = match.groups()[0]
     return name
+
+def load_mutation_data(term, course, project):
+    outerdir = '../data/icse-seet/{}/{}/p{}'.format(course, term, project)
+    mutation_csvs = glob.glob('{outerdir}/*/pitReports/mutations.csv'.format(outerdir=outerdir))
+    webcat_path = glob.glob('/home/ayaankazerouni/Developer/sensordata/data/{}/{}/submissions.csv' \
+            .format(course, term))
+
+    pit_mutations = []
+    columns = pit_results_header
+    for datafile in mutation_csvs:
+        assignment = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(datafile))))
+        if '2114' in datafile and assignment == 'p1':
+            continue
+        course_name = 'CS 2114' if '2114' in datafile else 'CS 3114'
+        try:
+            username = os.path.dirname(os.path.dirname(datafile))
+            assignment = 'Project {}'.format(os.path.basename(os.path.dirname(username))[1])
+            username = os.path.basename(username)
+            userdata = pd.read_csv(datafile, names=columns)
+            userdata['userName'] = username
+            userdata['assignment'] = assignment
+            pit_mutations.append(userdata)
+            del userdata
+        except pd.errors.EmptyDataError:
+            pass
+    pit_mutations = pd.concat(pit_mutations, sort=False).set_index(['userName', 'assignment'])
+    pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name) 
+    print('Loaded {} mutations'.format(pit_mutations.shape[0]))
+
+    submissions = pd.concat([getsubmissions(webcat_path=p) for p in webcat_path], sort=False,
+                            ignore_index=False)
+    if project != '*':
+        submissions = submissions.xs(key='Project {}'.format(project[0]), level='assignment', drop_level=False)
+    print('Loaded submissions')
+
+    mutators = get_mutator_specific_data(pit_mutations=pit_mutations, submissions=submissions)
+    print('Got mutator specific data. Getting main subsets...')
+    joined = get_main_subset_data(mutators, submissions=submissions)
+    print('Done. {} data points'.format(joined.shape[0]))
+    
+    return (mutators, joined, submissions)
 
