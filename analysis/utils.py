@@ -17,8 +17,9 @@ pit_deletion = [
     'VoidMethodCall',
     'NonVoidMethodCall',
     'ConstructorCall',
-    'BooleanTrueReturnVals',
-    'EmptyObjectReturnVals'
+    'AOD',
+    'OBBN2', 'OBBN3',
+    'MemberVariable'
 ]
 
 pit_sufficient = [
@@ -53,7 +54,13 @@ pit_full = [
     'ROR',
     'ReturnVals',
     'UOI',
-    'VoidMethodCall'
+    'VoidMethodCall',
+    'MemberVariable',
+    'Switch'
+]
+
+has_sub_mutators = [
+    'AOD', 'AOR', 'ROR', 'CRCR', 'OBBN', 'UOI'
 ]
 
 def getsubmissions(webcat_path, keepassignments=[], users=None): 
@@ -177,15 +184,33 @@ def aggregate_data(df, submissions=None, prefix=''):
     
     return pd.Series(result)
 
-def all_mutator_data(mutators, measure):
+def mutator_coverage_for_subset(mutators, subset=None):
     """Get a specific characteristic of all mutators.
     
     Use to format things for modelling.
 
     Args:
         mutators (pd.DataFrame): A DataFrame as returned by :meth:`get_mutator_specific_data`
-    """ 
-    return mutators[measure].unstack()
+    """
+    mutators = mutators.reset_index()
+    coverages = mutators.groupby(['userName', 'assignment']).apply(get_coverage_for_mutators)
+
+    if subset:
+        return coverages[subset]
+
+    return coverages 
+
+def get_coverage_for_mutators(df):
+	covs = {}
+	done = []
+	for item in pit_full:
+		op = re.match(r'([a-zA-Z]+)\d*', item).groups()[0]
+		if op in done:
+			continue
+		opdata = df[df.mutator.str.match(r'^{}'.format(op))]
+		covs[op] = opdata['killed'].sum() / opdata['num'].sum()
+		done.append(op)
+	return pd.Series(covs)
 
 def factorisedsubsets(df, dv):
     """Return a DataFrame with the operator subset as a factor. Use the result

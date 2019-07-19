@@ -21,8 +21,8 @@ Usage:
    Usage: see ./pit_runner.py --help
  - import mutation_runner 
 """
-
 import os
+import re
 import sys
 import json
 import time
@@ -229,15 +229,15 @@ class MutationRunner:
         self.targetclasses = targetclasses
         self.exclusion_class_rule = self.exclusion_class_rules[exclude_class]
         self.exclusion_test_rule  = self.exclusion_test_rules[exclude_test]
-
-        cwd = os.getcwd()
-        self.antpath = antpath or os.path.join(cwd, 'build.xml')
-        self.libpath = libpath or os.path.join(cwd, 'lib')
+        
+        wd = os.path.abspath(os.path.dirname(__file__))
+        self.antpath = antpath or os.path.join(wd, 'build.xml')
+        self.libpath = libpath or os.path.join(wd, 'lib')
 
     @classmethod
     def __check_mutators(cls, mutators):
-        return all([x in cls.all_mutators for x in mutators])
-
+        r = '|'.join(['^{}'.format(m) for m in cls.all_mutators])
+        return all([re.match(r, s) for s in mutators])  
 
     def testsingleproject(self):
         """Run mutation testing on a single project.
