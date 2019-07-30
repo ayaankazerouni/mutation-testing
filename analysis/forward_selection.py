@@ -12,14 +12,15 @@ class CandidateModel:
         self.cost = cost 
         self.coverage = coverage 
 
-def forward_selection(data, response, mutators=None, full_num=None, del_num=None):
+def forward_selection(data, response, mutators=None, full_num=None, del_num=None, log=True):
     """Linear model designed by forward selection.
     Credit: https://planspace.org/20150423-forward_selection_with_statsmodels/
     """
     candidates = list(data.columns)
     candidates.remove(response)
-    print('{} data points'.format(len(data)))
-    print('Initial candidates: {}'.format(candidates))
+    if log:
+        print('{} data points'.format(len(data)))
+        print('Initial candidates: {}'.format(candidates))
     initial_mutators = len(candidates)
     selected = []
     maxint = sys.maxsize
@@ -55,16 +56,20 @@ def forward_selection(data, response, mutators=None, full_num=None, del_num=None
             candidates.remove(best.candidate)
             selected.append(best.candidate)
             current_score = best.score 
-            print('Add {}.'.format(best.candidate))
+            if log:
+                print('Add {}.'.format(best.candidate))
             if best.cost is not None:
-                print('\t{:.2%} of FULL.'.format(best.cost / full_num), end=' ')
-                if del_num is not None:
-                    print('{:.2%} of DELETION.'.format(best.cost / del_num))
-                print('\tCoverage: {}'.format(best.coverage))
-            print('\tR^2 = {:.2%}.'.format(best.model.rsquared_adj))
+                if log:
+                    print('\t{:.2%} of FULL.'.format(best.cost / full_num), end=' ')
+                    if del_num is not None:
+                        print('{:.2%} of DELETION.'.format(best.cost / del_num))
+                    print('\tCoverage: {}'.format(best.coverage))
+            if log:
+                print('\tR^2 = {:.2%}.'.format(best.model.rsquared_adj))
             models.append(best.model)
 
-    print('Selected {} / {} mutators'.format(len(selected), initial_mutators))
+    if log:
+        print('Selected {} / {} mutators'.format(len(selected), initial_mutators))
     
     return models, selected
 

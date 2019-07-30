@@ -18,7 +18,6 @@ pit_deletion = [
     'NonVoidMethodCall',
     'ConstructorCall',
     'AOD',
-    'OBBN2', 'OBBN3',
     'MemberVariable'
 ]
 
@@ -67,13 +66,15 @@ def getsubmissions(webcat_path, keepassignments=[], users=None):
     """Get Web-CAT submissions for the specified users on the specified assignments.""" 
     pluscols = ['statements', 'statements.test', 'statements.nontest', 
                 'methods.test', 'methods.nontest', 'conditionals.nontest']
+    course = os.path.basename(os.path.dirname(os.path.dirname(webcat_path)))
     submissions = load_datasets.load_submission_data(webcat_path, pluscols=pluscols, 
                     keepassignments=keepassignments).reset_index()
     submissions['assignment'] = submissions['assignment'] \
             .apply(lambda a: re.search(r'Project \d', a).group())
+    submissions['course'] = 'CS ' + course[0]
     if users is not None:
         submissions = submissions.query('userName in @users')
-    cols = ['userName', 'assignment', 'score', 'methods.test', 'methods.nontest', 'statements', 
+    cols = ['userName', 'assignment', 'course', 'score', 'methods.test', 'methods.nontest', 'statements', 
             'statements.test', 'statements.nontest', 'elementsCovered', 'conditionals.nontest']
     return submissions[cols].set_index(['userName', 'assignment'])
 

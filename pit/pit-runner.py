@@ -159,6 +159,7 @@ class MutationRunner:
         'INLINE_CONSTS',
         'RETURN_VALS',
         'EXPERIMENTAL_MEMBER_VARIABLE',
+        'EXPERIMENTAL_LOCAL_VARIABLE',
         'EXPERIMENTAL_SWITCH',
         'ABS',
         'AOD',
