@@ -254,8 +254,6 @@ class MutationRunner:
             (dict): The coverage percentages, completed subprocess, and running time
                     for each mutation operator (if self.steps)
         """
-        # utils.clone_project(self.projectpath, self.clonepath)
-
         if not self.steps:
             start = time.time()
             pitreports = os.path.join(self.clonepath, 'pitReports')

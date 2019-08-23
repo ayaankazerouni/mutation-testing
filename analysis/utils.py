@@ -254,7 +254,8 @@ def load_mutation_data(term, course, project):
             .format(course, term))
 
     pit_mutations = []
-    columns = pit_results_header
+    columns = ['fileName', 'fullyQualifiedClassName', 'mutator', 'methodName', 'lineNumber', 'killed', 'killingTest']
+    nvs = []
     for datafile in mutation_csvs:
         assignment = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(datafile))))
         if '2114' in datafile and assignment == 'p1':
@@ -265,6 +266,8 @@ def load_mutation_data(term, course, project):
             assignment = 'Project {}'.format(os.path.basename(os.path.dirname(username))[1])
             username = os.path.basename(username)
             userdata = pd.read_csv(datafile, names=columns)
+            nv = userdata[userdata['killed'] == 'NON_VIABLE'].shape[0] / userdata.shape[0]
+            nvs.append(nv)
             userdata['userName'] = username
             userdata['assignment'] = assignment
             pit_mutations.append(userdata)
