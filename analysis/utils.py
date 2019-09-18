@@ -82,9 +82,10 @@ def get_mutator_specific_data(pit_mutations, submissions=None, **kwargs):
     """Get characteristics of individual mutation operators, for each project."""
     if submissions is None:
         assignments = kwargs.get('assignments', ['Project 2'])
-        subpath = kwargs.get('webcat_path', webcat_path)
-        submissions = getsubmissions(webcat_path=subpath, users=pit_mutations.userName.unique(),
-                                     assignments=assignments)
+        subpath = kwargs.get('webcat_path', None)
+        if submissions is None and subpath is not None:
+            submissions = getsubmissions(webcat_path=subpath, users=pit_mutations.userName.unique(),
+                                        assignments=assignments)
     pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name)
     return pit_mutations.groupby(['userName', 'assignment', 'mutator']).apply(__mutator_specific_data_helper, submissions)
 
@@ -94,8 +95,8 @@ def __mutator_specific_data_helper(mutations, submissions):
         return None
 
     total = mutations.shape[0]
-    survived = mutations.query('killed == "SURVIVED"').shape[0]
-    killed = total - survived
+    survived = mutations.query('killed in ["SURVIVED", "NO_COVERAGE"]').shape[0]
+    killed = mutations.query('killed in ["KILLED", "TIMED_OUT"]').shape[0]
     loc = submissions.loc[(username, assignment), 'statements.nontest']
     mpl = total / loc
     return pd.Series({
@@ -194,11 +195,11 @@ def mutator_coverage_for_subset(mutators, subset=None):
         mutators (pd.DataFrame): A DataFrame as returned by :meth:`get_mutator_specific_data`
     """
     mutators = mutators.reset_index()
-    coverages = mutators.groupby(['userName', 'assignment']).apply(get_coverage_for_mutators, subset=subset)
+    coverages = mutators.groupby(['userName', 'assignment']).apply(__get_coverage_for_mutators, subset=subset)
 
     return coverages 
 
-def get_coverage_for_mutators(df, subset=None):
+def __get_coverage_for_mutators(df, subset=None):
     covs = {}
     done = []
     subset = subset or pit_full
@@ -255,7 +256,6 @@ def load_mutation_data(term, course, project):
 
     pit_mutations = []
     columns = ['fileName', 'fullyQualifiedClassName', 'mutator', 'methodName', 'lineNumber', 'killed', 'killingTest']
-    nvs = []
     for datafile in mutation_csvs:
         assignment = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(datafile))))
         if '2114' in datafile and assignment == 'p1':
@@ -266,8 +266,6 @@ def load_mutation_data(term, course, project):
             assignment = 'Project {}'.format(os.path.basename(os.path.dirname(username))[1])
             username = os.path.basename(username)
             userdata = pd.read_csv(datafile, names=columns)
-            nv = userdata[userdata['killed'] == 'NON_VIABLE'].shape[0] / userdata.shape[0]
-            nvs.append(nv)
             userdata['userName'] = username
             userdata['assignment'] = assignment
             pit_mutations.append(userdata)
