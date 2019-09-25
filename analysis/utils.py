@@ -97,14 +97,16 @@ def __mutator_specific_data_helper(mutations, submissions):
     total = mutations.shape[0]
     survived = mutations.query('killed in ["SURVIVED", "NO_COVERAGE"]').shape[0]
     killed = mutations.query('killed in ["KILLED", "TIMED_OUT"]').shape[0]
-    loc = submissions.loc[(username, assignment), 'statements.nontest']
-    mpl = total / loc
-    return pd.Series({
+    result = {
         'num': total,
         'killed': killed,
-        'cov': killed / total,
-        'mpl': mpl
-    })
+        'cov': killed / total
+    }
+    if submissions:
+        loc = submissions.loc[(username, assignment), 'statements.nontest']
+        mpl = total / loc
+        result['mpl'] = mpl
+    return pd.Series(result)
 
 def get_running_time(resultfile):
     """Get running time from the NDJSON file at `resultfile`."""
@@ -130,18 +132,18 @@ def get_main_subset_data(mutators, submissions):
         A DataFrame containing columns {subset}_cov, {subset}_surv, {subset}_mpl, 
         {subset}_num, and {subset}_runningTime, where subset is each of the main subsets.
     """
-    deletion = get_data_for_subset(mutators, submissions=submissions, subset=pit_deletion, prefix='deletion')
-    default = get_data_for_subset(mutators, submissions=submissions, subset=pit_default, prefix='default')
-    sufficient = get_data_for_subset(mutators, submissions=submissions, subset=pit_sufficient, 
+    deletion = get_data_for_subset(mutators, subset=pit_deletion, prefix='deletion')
+    default = get_data_for_subset(mutators, subset=pit_default, prefix='default')
+    sufficient = get_data_for_subset(mutators, subset=pit_sufficient, 
                                      prefix='sufficient')
-    full = get_data_for_subset(mutators, submissions=submissions, subset=pit_full, prefix='full')
+    full = get_data_for_subset(mutators, subset=pit_full, prefix='full')
     joined = deletion.merge(right=default, right_index=True, left_index=True) \
                      .merge(right=sufficient, right_index=True, left_index=True) \
                      .merge(right=full, right_index=True, left_index=True)
 
     return joined
 
-def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
+def get_data_for_subset(df, subset=None, prefix=''):
     """Get characteristic data for the specified subset.
     Acts on data as returned by `get_mutator_specific_data`.
     
@@ -160,13 +162,13 @@ def get_data_for_subset(df, subset=None, submissions=None, prefix=''):
         r = '|'.join(['^{}'.format(m) for m in subset])
         df = df[df.mutator.str.match(r)]
     result = df.groupby(['userName', 'assignment']) \
-               .apply(aggregate_data, submissions, prefix)
+               .apply(aggregate_data, prefix)
     if isinstance(result, pd.Series):
         result = result.unstack()
 
     return result
 
-def aggregate_data(df, submissions=None, prefix=''):
+def aggregate_data(df, prefix=''):
     idx = df.name
     
     if prefix:
@@ -178,11 +180,6 @@ def aggregate_data(df, submissions=None, prefix=''):
         '{}num'.format(prefix): num,
         '{}cov'.format(prefix): cov,
     }
-    
-    if submissions is not None and idx in submissions.index:
-        loc = submissions.loc[idx, 'statements.nontest']
-        mpl = num / loc
-        result['{}mpl'.format(prefix)] = mpl
     
     return pd.Series(result)
 
@@ -276,16 +273,10 @@ def load_mutation_data(term, course, project):
     pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name) 
     print('Loaded {} mutations'.format(pit_mutations.shape[0]))
 
-    submissions = pd.concat([getsubmissions(webcat_path=p) for p in webcat_path], sort=False,
-                            ignore_index=False)
-    if project != '*':
-        submissions = submissions.xs(key='Project {}'.format(project[0]), level='assignment', drop_level=False)
-    print('Loaded submissions')
-
-    mutators = get_mutator_specific_data(pit_mutations=pit_mutations, submissions=submissions)
+    mutators = get_mutator_specific_data(pit_mutations=pit_mutations)
     print('Got mutator specific data. Getting main subsets...')
-    joined = get_main_subset_data(mutators, submissions=submissions)
-    print('Done. {} data points'.format(joined.shape[0]))
+    main_subsets = get_main_subset_data(mutators)
+    print('Done. {} data points'.format(main_subsets.shape[0]))
     
-    return (mutators, joined, submissions)
+    return (mutators, main_subsets)
 
