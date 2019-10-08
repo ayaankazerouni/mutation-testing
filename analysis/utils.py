@@ -83,7 +83,7 @@ def get_mutator_specific_data(pit_mutations, submissions=None, **kwargs):
     if submissions is None:
         assignments = kwargs.get('assignments', ['Project 2'])
         subpath = kwargs.get('webcat_path', None)
-        if submissions is None and subpath is not None:
+        if subpath is not None:
             submissions = getsubmissions(webcat_path=subpath, users=pit_mutations.userName.unique(),
                                         assignments=assignments)
     pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name)
@@ -91,7 +91,7 @@ def get_mutator_specific_data(pit_mutations, submissions=None, **kwargs):
 
 def __mutator_specific_data_helper(mutations, submissions):
     username, assignment, _ = mutations.name
-    if (username, assignment) not in submissions.index:
+    if submissions and (username, assignment) not in submissions.index:
         return None
 
     total = mutations.shape[0]
@@ -119,7 +119,7 @@ def get_running_time(resultfile):
             results[username] = runningtime
     return pd.Series(results)
 
-def get_main_subset_data(mutators, submissions):
+def get_main_subset_data(mutators):
     """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
     
     Args:
@@ -150,8 +150,6 @@ def get_data_for_subset(df, subset=None, prefix=''):
     Args:
         df (pd.DataFrame): Mutator specific data
         subset (list): A list of mutation operators
-        submissions (pd.DataFrame): Web-CAT submissions. Required for
-                                    efficiency and mutants per loc
     
     Returns:
         A DataFrame containing columns "{prefix}_{measure}", where measure
@@ -258,9 +256,10 @@ def load_mutation_data(term, course, project):
         if '2114' in datafile and assignment == 'p1':
             continue
         course_name = 'CS 2114' if '2114' in datafile else 'CS 3114'
+        course_num = 2 if '2114' in datafile else 3 
         try:
             username = os.path.dirname(os.path.dirname(datafile))
-            assignment = 'Project {}'.format(os.path.basename(os.path.dirname(username))[1])
+            assignment = 'CS {} Project {}'.format(course_num, os.path.basename(os.path.dirname(username))[1])
             username = os.path.basename(username)
             userdata = pd.read_csv(datafile, names=columns)
             userdata['userName'] = username
