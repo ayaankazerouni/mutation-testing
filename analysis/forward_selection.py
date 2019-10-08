@@ -37,8 +37,8 @@ def forward_selection(data, response, mutators=None, full_num=None, del_num=None
             coverage = None
             if full_num is not None:
                 subset_data = utils.get_data_for_subset(mutators, subset=features)
-                subset_data = subset_data.loc[data.index]
-                cost = subset_data['num'].sum()
+                # subset_data = subset_data.loc[data.index]
+                cost = subset_data['num'].median()
                 coverage = (subset_data['cov'].mean(), subset_data['cov'].std())
             model = smf.ols(formula, data=data).fit()
             score = model.bic
@@ -55,12 +55,12 @@ def forward_selection(data, response, mutators=None, full_num=None, del_num=None
         if current_score > best.score:
             candidates.remove(best.candidate)
             selected.append(best.candidate)
-            current_score = best.score 
+            current_score = best.score
             if log:
                 print('Add {}.'.format(best.candidate))
             if best.cost is not None:
                 if log:
-                    print('\t{:.2%} of FULL.'.format(best.cost / full_num), end=' ')
+                    print('{} mutants.\t{:.2%} of FULL.'.format(best.cost, best.cost / full_num), end=' ')
                     if del_num is not None:
                         print('{:.2%} of DELETION.'.format(best.cost / del_num))
                     print('\tCoverage: {}'.format(best.coverage))
