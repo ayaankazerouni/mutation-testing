@@ -127,10 +127,9 @@ class MutationRunner:
         'VOID_METHOD_CALLS',
         'NON_VOID_METHOD_CALLS',
         'CONSTRUCTOR_CALLS',
-        'TRUE_RETURNS',
-        'FALSE_RETURNS',
-        'PRIMITIVE_RETURNS',
-        'EMPTY_RETURNS'
+        'AOD',
+        'EXPERIMENTAL_MEMBER_VARIABLE',
+        'OBBN2', 'OBBN3'
     ]
 
     sufficient_mutators = [
@@ -150,24 +149,25 @@ class MutationRunner:
         'VOID_METHOD_CALLS'
     ]
 
-    all_mutators = deletion_mutators + [
-        'CONDITIONALS_BOUNDARY',
-        'NEGATE_CONDITIONALS',
-        'MATH',
-        'INCREMENTS',
-        'INVERT_NEGS',
-        'INLINE_CONSTS',
-        'RETURN_VALS',
-        'EXPERIMENTAL_MEMBER_VARIABLE',
-        'EXPERIMENTAL_LOCAL_VARIABLE',
-        'EXPERIMENTAL_SWITCH',
+    all_mutators = [
         'ABS',
         'AOD',
-        'AOR',
+        'AOR2', 'AOR3', 'AOR4',
+        'TRUE_RETURNS',
         'CRCR',
-        'OBBN',
+        'REMOVE_CONDITIONALS',
+        'CONSTRUCTOR_CALLS',
+        'EMPTY_RETURNS',
+        'INCREMENTS',
+        'INLINE_CONSTS',
+        'MATH',
+        'NON_VOID_METHOD_CALLS',
+        'VOID_METHOD_CALLS',
         'ROR',
-        'UOI'
+        'RETURN_VALS',
+        'UOI',
+        'EXPERIMENTAL_MEMBER_VARIABLE',
+        'EXPERIMENTAL_SWITCH'
     ]
     
     #Defining exclusion rules
