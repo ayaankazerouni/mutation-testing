@@ -22,5 +22,5 @@ esac
   docker run \
     -v ${clonedir}:${clonedir} \
     -v $PWD:/usr/src/app \
-    -it --rm $container
+    -d --rm $container
 

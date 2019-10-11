@@ -114,7 +114,7 @@
       targetTests="${target_tests}"
       targetClasses="${target_classes}"
       excludedClasses="${target_tests}"
-      threads="2"
+      threads="1"
       reportDir="${pit_reports}"
       timestampedReports="false"
       sourceDir="src/"
