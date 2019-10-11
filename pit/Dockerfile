@@ -3,7 +3,6 @@ FROM ubuntu:18.04
 # variables
 ARG BASEDIR="/usr/src/app"
 ARG CLONEDIR="/tmp/mutation-testing"
-ARG DATADIR
 ARG TASKFILE
 
 # Install java, ant, python3, and pip
@@ -25,15 +24,7 @@ VOLUME ${CLONEDIR}
 # directory containing source code and dependencies 
 VOLUME ${BASEDIR}
 
-# directory containing student projects to be analysed
-VOLUME ${DATADIR}
-
 WORKDIR ${BASEDIR}
-
-RUN \
-  ./write_tasks.py datadir >> tasks.ndjson && \
-  mkdir -p ${CLONEDIR} && \
-  ./clone-projects.py tasks.ndjson -p
 
 CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all > /usr/src/app/mutation-results.ndjson"]
 # CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all -c project1.DisplayCollection > /usr/src/app/mutation-results.ndjson"]
