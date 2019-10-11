@@ -3,6 +3,7 @@ FROM ubuntu:18.04
 # variables
 ARG BASEDIR="/usr/src/app"
 ARG CLONEDIR="/tmp/mutation-testing"
+ARG UID
 ARG TASKFILE
 
 # Install java, ant, python3, and pip
@@ -25,6 +26,10 @@ VOLUME ${CLONEDIR}
 VOLUME ${BASEDIR}
 
 WORKDIR ${BASEDIR}
+
+# Create a user with the same UID as host user so we have permissions
+RUN useradd -r -u ${UID} appuser
+USER appuser
 
 CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all > /usr/src/app/mutation-results.ndjson"]
 # CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all -c project1.DisplayCollection > /usr/src/app/mutation-results.ndjson"]
