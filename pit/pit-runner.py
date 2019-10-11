@@ -129,7 +129,7 @@ class MutationRunner:
         'CONSTRUCTOR_CALLS',
         'AOD',
         'EXPERIMENTAL_MEMBER_VARIABLE',
-        'OBBN2', 'OBBN3'
+        'OBBN'
     ]
 
     sufficient_mutators = [
@@ -152,7 +152,7 @@ class MutationRunner:
     all_mutators = [
         'ABS',
         'AOD',
-        'AOR2', 'AOR3', 'AOR4',
+        'AOR',
         'TRUE_RETURNS',
         'CRCR',
         'REMOVE_CONDITIONALS',
