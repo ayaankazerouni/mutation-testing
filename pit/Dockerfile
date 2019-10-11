@@ -31,7 +31,7 @@ VOLUME ${DATADIR}
 WORKDIR ${BASEDIR}
 
 RUN \
-  ./write_tasks.py ${DATADIR} >> tasks.ndjson && \
+  ./write_tasks.py datadir >> tasks.ndjson && \
   mkdir -p ${CLONEDIR} && \
   ./clone-projects.py tasks.ndjson -p
 
