@@ -24,9 +24,6 @@ VOLUME ${CLONEDIR}
 # directory containing source code and dependencies 
 VOLUME ${BASEDIR}
 
-# directory containing student projects to be analysed
-VOLUME ${DATADIR}
-
 WORKDIR ${BASEDIR}
 
 CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all > /usr/src/app/mutation-results.ndjson"]
