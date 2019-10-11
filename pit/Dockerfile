@@ -19,9 +19,6 @@ RUN \
   python3 -m pip install pandas && \
   rm -rf /var/lib/apt/lists/*;
 
-COPY ../clone-projects.py /usr/src/app/clone-projects.py
-COPY ../write_tasks.py /usr/src/app/write_tasks.py
-
 # directory to which to projects will be cloned
 VOLUME ${CLONEDIR}
 
