@@ -3,7 +3,7 @@ FROM ubuntu:18.04
 # variables
 ARG BASEDIR="/usr/src/app"
 ARG CLONEDIR="/tmp/mutation-testing"
-ARG PROJDIR
+ARG DATADIR
 ARG TASKFILE
 
 # Install java, ant, python3, and pip
@@ -19,20 +19,28 @@ RUN \
   python3 -m pip install pandas && \
   rm -rf /var/lib/apt/lists/*;
 
+COPY ../clone-projects.py /usr/src/app/clone-projects.py
+COPY ../write_tasks.py /usr/src/app/write_tasks.py
+
+# directory to which to projects will be cloned
 VOLUME ${CLONEDIR}
 
 # directory containing source code and dependencies 
 VOLUME ${BASEDIR}
 
-# task file 
-ENV TASKFILE ${TASKFILE}
+# directory containing student projects to be analysed
+VOLUME ${DATADIR}
 
-# directory that will contain projects prepared for PIT testing
 WORKDIR ${BASEDIR}
 
-CMD ["bash", "-c", "./pit-runner.py ${TASKFILE} -l -m all > /usr/src/app/mutation-results.ndjson"]
-# CMD ["bash", "-c", "./pit-runner.py ${TASKFILE} -l -m all -c project1.DisplayCollection > /usr/src/app/mutation-results.ndjson"]
-# CMD ["bash", "-c", "./pit-runner.py ${TASKFILE} -l -m all -c game.SimpleArrayBag,game.SimpleLinkedBag > /usr/src/app/mutation-results.ndjson"]
-# CMD ["bash", "-c", "./pit-runner.py ${TASKFILE} -l -m all -c spacecolonies.ArrayQueue,spacecolonies.ColonyCalculator,spacecolonies.Person,spacecolonies.Planet,spacecolonies.Skills,spacecolonies.SpaceColonyDataException  > /usr/src/app/mutation-results.ndjson"]
-# CMD ["bash", "-c", "./pit-runner.py ${TASKFILE} -l -m all -c towerofhanoi.Disc,towerofhanoi.HanoiSolver,towerofhanoi.LinkedStack,towerofhanoi.Tower > /usr/src/app/mutation-results.ndjson"]
-# CMD ["bash", "-c", "./pit-runner.py ${TASKFILE} -l -m all -e p5-excludeGUI -t p5-excludeInputReference > /usr/src/app/mutation-results.ndjson"] 
+RUN \
+  ./write_tasks.py ${DATADIR} >> tasks.ndjson && \
+  mkdir -p ${CLONEDIR} && \
+  ./clone-projects.py tasks.ndjson -p
+
+CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all > /usr/src/app/mutation-results.ndjson"]
+# CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all -c project1.DisplayCollection > /usr/src/app/mutation-results.ndjson"]
+# CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all -c game.SimpleArrayBag,game.SimpleLinkedBag > /usr/src/app/mutation-results.ndjson"]
+# CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all -c spacecolonies.ArrayQueue,spacecolonies.ColonyCalculator,spacecolonies.Person,spacecolonies.Planet,spacecolonies.Skills,spacecolonies.SpaceColonyDataException  > /usr/src/app/mutation-results.ndjson"]
+# CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all -c towerofhanoi.Disc,towerofhanoi.HanoiSolver,towerofhanoi.LinkedStack,towerofhanoi.Tower > /usr/src/app/mutation-results.ndjson"]
+# CMD ["bash", "-c", "./pit-runner.py tasks.ndjson -l -m all -e p5-excludeGUI -t p5-excludeInputReference > /usr/src/app/mutation-results.ndjson"] 
