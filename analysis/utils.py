@@ -97,9 +97,11 @@ def __mutator_specific_data_helper(mutations, submissions):
     total = mutations.shape[0]
     survived = mutations.query('killed in ["SURVIVED", "NO_COVERAGE"]').shape[0]
     killed = mutations.query('killed in ["KILLED", "TIMED_OUT"]').shape[0]
+    timed_out = mutations.query('killed == "TIMED_OUT"').shape[0]
     result = {
         'num': total,
         'killed': killed,
+        'timed_out': timed_out,
         'cov': killed / total
     }
     if submissions:
@@ -110,14 +112,23 @@ def __mutator_specific_data_helper(mutations, submissions):
 
 def get_running_time(resultfile):
     """Get running time from the NDJSON file at `resultfile`."""
-    results = {}
-    with open(os.path.abspath(resultfile)) as infile:
+    results = []
+    pathtofile = os.path.abspath(resultfile)
+    course = '2' if '2114' in pathtofile else '3'
+    assignmentdir = re.match(r'.*p(\d)', pathtofile).groups()[0]
+    assignment = 'CS {} Project {}'.format(course, assignmentdir)
+    with open(pathtofile) as infile:
         for line in infile:
             result = json.loads(line)
-            username = os.path.basename(result['projectPath'])
-            runningtime = result['runningTime']
-            results[username] = runningtime
-    return pd.Series(results)
+            if result['success']:
+                username = os.path.basename(result['projectPath'])
+                runningtime = result['runningTime']
+                results.append({
+                    'userName': username,
+                    'runningTime': runningtime,
+                    'assignment': assignment
+                })
+    return pd.DataFrame(results)
 
 def get_main_subset_data(mutators):
     """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
