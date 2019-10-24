@@ -19,7 +19,6 @@ Mutation testing dependencies:
 Usage:
  - Run as a CLI tool on one or more projects using a task file.
    Usage: see ./pit_runner.py --help
- - import mutation_runner 
 """
 import os
 import re
@@ -169,28 +168,6 @@ class MutationRunner:
         'EXPERIMENTAL_MEMBER_VARIABLE',
         'EXPERIMENTAL_SWITCH'
     ]
-    
-    #Defining exclusion rules
-    def __check_class_gui_window(filename):
-        if not "java" in filename:
-            # Default rule: if the file is not a java file, exclude it from testing
-            return True
-        if "GUI" in filename or "Window" in filename or "Test" in filename:
-            return True
-        #Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
-        return False
-    
-    def __check_test_InputReference(filename):
-        if not "java" in filename:
-            # Default rule: if the file is not a java file, exclude it from testing
-            return True
-        if "Test" in filename:
-            if "InputReference" in filename:
-                return True
-            else:
-                return False
-        #Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
-        return True
 
     exclusion_class_rules = {
             None: None,
@@ -239,6 +216,29 @@ class MutationRunner:
     def __check_mutators(cls, mutators):
         r = '|'.join(['^{}'.format(m) for m in cls.all_mutators])
         return all([re.match(r, s) for s in mutators])  
+    
+    @classmethod
+    def __check_class_gui_window(cls, filename):
+        if not "java" in filename:
+            # Default rule: if the file is not a java file, exclude it from testing
+            return True
+        if "GUI" in filename or "Window" in filename or "Test" in filename:
+            return True
+        # Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
+        return False
+
+    @classmethod 
+    def __check_test_InputReference(cls, filename):
+        if not "java" in filename:
+            # Default rule: if the file is not a java file, exclude it from testing
+            return True
+        if "Test" in filename:
+            if "InputReference" in filename:
+                return True
+            else:
+                return False
+        #Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
+        return True
 
     def testsingleproject(self):
         """Run mutation testing on a single project.
