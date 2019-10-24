@@ -17,9 +17,10 @@ esac
   docker build \
     --build-arg TASKFILE=$taskfile \
     --build-arg CLONEDIR=$clonedir \
+    --build-arg UID=$(echo $UID) \
     -t $container . && \
   docker run \
     -v ${clonedir}:${clonedir} \
     -v $PWD:/usr/src/app \
-    -it --rm $container
+    -d --rm $container
 
