@@ -10,7 +10,11 @@ import pandas as pd
 modulepath = os.path.expanduser(os.path.join('~', 'Developer'))
 if os.path.exists(modulepath) and modulepath not in sys.path:
     sys.path.append(modulepath)
+<<<<<<< HEAD
 from sensordata import load_datasets   
+=======
+from sensordata import load_datasets
+>>>>>>> 46ced806f53e055795a7a80de6ab4931f203efe9
 
 pit_deletion = [
     'RemoveConditional',
@@ -97,9 +101,17 @@ def __mutator_specific_data_helper(mutations, submissions):
     total = mutations.shape[0]
     survived = mutations.query('killed in ["SURVIVED", "NO_COVERAGE"]').shape[0]
     killed = mutations.query('killed in ["KILLED", "TIMED_OUT"]').shape[0]
+<<<<<<< HEAD
     result = {
         'num': total,
         'killed': killed,
+=======
+    timed_out = mutations.query('killed == "TIMED_OUT"').shape[0]
+    result = {
+        'num': total,
+        'killed': killed,
+        'timed_out': timed_out,
+>>>>>>> 46ced806f53e055795a7a80de6ab4931f203efe9
         'cov': killed / total
     }
     if submissions:
@@ -110,6 +122,7 @@ def __mutator_specific_data_helper(mutations, submissions):
 
 def get_running_time(resultfile):
     """Get running time from the NDJSON file at `resultfile`."""
+<<<<<<< HEAD
     results = {}
     with open(os.path.abspath(resultfile)) as infile:
         for line in infile:
@@ -118,6 +131,25 @@ def get_running_time(resultfile):
             runningtime = result['runningTime']
             results[username] = runningtime
     return pd.Series(results)
+=======
+    results = []
+    pathtofile = os.path.abspath(resultfile)
+    course = '2' if '2114' in pathtofile else '3'
+    assignmentdir = re.match(r'.*p(\d)', pathtofile).groups()[0]
+    assignment = 'CS {} Project {}'.format(course, assignmentdir)
+    with open(pathtofile) as infile:
+        for line in infile:
+            result = json.loads(line)
+            if result['success']:
+                username = os.path.basename(result['projectPath'])
+                runningtime = result['runningTime']
+                results.append({
+                    'userName': username,
+                    'runningTime': runningtime,
+                    'assignment': assignment
+                })
+    return pd.DataFrame(results)
+>>>>>>> 46ced806f53e055795a7a80de6ab4931f203efe9
 
 def get_main_subset_data(mutators):
     """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
@@ -232,6 +264,7 @@ def __clean_subset_name(n):
 
     return n
 
+<<<<<<< HEAD
 def __clean_mutator_name(name):
     """Sanitise mutation operator names."""
     prefixes = ['AOD', 'ROR', 'UOI', 'OBBN', 'CRCR']
@@ -241,6 +274,21 @@ def __clean_mutator_name(name):
         match = re.match(r'^(\w+)\d$', name)
         if match:
             name = match.groups()[0]
+=======
+def __clean_mutator_name(name, include_aor=False):
+    """Sanitise mutation operator names."""
+    prefixes = ['AOD', 'ROR', 'UOI', 'OBBN', 'CRCR']
+    if include_aor:
+        prefixes.append('AOR')
+    name = name.split('.')[-1]
+    name = name.split('Mutator')[0]
+    for item in prefixes:
+        if name.startswith(item):
+            match = re.match(r'^(\w+)\d$', name)
+            if match:
+                name = match.groups()[0]
+            continue
+>>>>>>> 46ced806f53e055795a7a80de6ab4931f203efe9
     return name
 
 def load_mutation_data(term, course, project):

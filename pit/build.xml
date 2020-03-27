@@ -17,22 +17,20 @@
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
     <pathelement location="${resource_dir}/JavaTddPluginSupport.jar" />
-    <pathelement location="${resource_dir}/junit.jar" />
+    <!-- <pathelement location="${resource_dir}/junit.jar" />
     <pathelement location="${resource_dir}/student.jar" />
     <pathelement location="${resource_dir}/CarranoDataStructures.jar" />
     <pathelement location="${resource_dir}/GraphWindow.jar" />
     <pathelement location="${resource_dir}/BSTstudent-provided.jar"/>
-    <pathelement location="${resource_dir}/bsh.jar" />
+    <pathelement location="${resource_dir}/bsh.jar" /> -->
     <pathelement location="${bin_dir}"/>
   </path>
 
   <!-- classpath for pitest and its dependencies (including test libraries)-->
   <path id="pitest.path">
-    <pathelement location="${resource_dir}/junit.jar" />
     <pathelement location="${resource_dir}/pitest.jar" />
     <pathelement location="${resource_dir}/pitest-entry.jar" />
     <pathelement location="${resource_dir}/pitest-ant.jar" />
-    <pathelement location="${resource_dir}/student.jar"/>
   </path>
 
   <taskdef name="pitest" classname="org.pitest.ant.PitestTask" classpathref="pitest.path" />
