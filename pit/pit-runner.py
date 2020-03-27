@@ -169,18 +169,6 @@ class MutationRunner:
         'EXPERIMENTAL_SWITCH'
     ]
 
-    exclusion_class_rules = {
-            None: None,
-            "p5-excludeGUI": __check_class_gui_window,
-            "excludeGUI": __check_class_gui_window
-    }
-
-    exclusion_test_rules = {
-            None: None,
-            "p5-excludeInputReference":__check_test_InputReference,
-            "excludeInputReference":__check_test_InputReference
-    }
-
     def __init__(self, projectpath, antpath=None, libpath=None,
                  steps=False, mutators='all', targetclasses='',
                  exclude_class=None, exclude_test=None):
@@ -203,10 +191,22 @@ class MutationRunner:
             else:
                 raise ValueError(('Use keywords all, deletion, default, sufficient, '
                                 'or a comma-separated valid set of mutation operators'))
+
+        exclusion_class_rules = {
+                None: None,
+                "p5-excludeGUI": MutationRunner.__check_class_gui_window,
+                "excludeGUI": MutationRunner.__check_class_gui_window
+        }
+
+        exclusion_test_rules = {
+                None: None,
+                "p5-excludeInputReference": MutationRunner.__check_test_InputReference,
+                "excludeInputReference": MutationRunner.__check_test_InputReference
+        }
         
         self.targetclasses = targetclasses
-        self.exclusion_class_rule = self.exclusion_class_rules[exclude_class]
-        self.exclusion_test_rule  = self.exclusion_test_rules[exclude_test]
+        self.exclusion_class_rule = exclusion_class_rules[exclude_class]
+        self.exclusion_test_rule  = exclusion_test_rules[exclude_test]
         
         wd = os.path.abspath(os.path.dirname(__file__))
         self.antpath = antpath or os.path.join(wd, 'build.xml')

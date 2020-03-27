@@ -10,7 +10,7 @@ import pandas as pd
 modulepath = os.path.expanduser(os.path.join('~', 'Developer'))
 if os.path.exists(modulepath) and modulepath not in sys.path:
     sys.path.append(modulepath)
-from sensordata import load_datasets   
+from sensordata import load_datasets
 
 pit_deletion = [
     'RemoveConditional',
@@ -243,15 +243,19 @@ def __clean_subset_name(n):
 
     return n
 
-def __clean_mutator_name(name):
+def __clean_mutator_name(name, include_aor=False):
     """Sanitise mutation operator names."""
     prefixes = ['AOD', 'ROR', 'UOI', 'OBBN', 'CRCR']
+    if include_aor:
+        prefixes.append('AOR')
     name = name.split('.')[-1]
     name = name.split('Mutator')[0]
-    if name in prefixes:
-        match = re.match(r'^(\w+)\d$', name)
-        if match:
-            name = match.groups()[0]
+    for item in prefixes:
+        if name.startswith(item):
+            match = re.match(r'^(\w+)\d$', name)
+            if match:
+                name = match.groups()[0]
+            continue
     return name
 
 def load_mutation_data(term, course, project):
