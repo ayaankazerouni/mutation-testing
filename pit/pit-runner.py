@@ -168,40 +168,6 @@ class MutationRunner:
         'EXPERIMENTAL_MEMBER_VARIABLE',
         'EXPERIMENTAL_SWITCH'
     ]
-    
-    #Defining exclusion rules
-    def __check_class_gui_window(filename):
-        if not "java" in filename:
-            # Default rule: if the file is not a java file, exclude it from testing
-            return True
-        if "GUI" in filename or "Window" in filename or "Test" in filename:
-            return True
-        #Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
-        return False
-    
-    def __check_test_InputReference(filename):
-        if not "java" in filename:
-            # Default rule: if the file is not a java file, exclude it from testing
-            return True
-        if "Test" in filename:
-            if "InputReference" in filename:
-                return True
-            else:
-                return False
-        #Ignore this class anyway, it is a default behaviour for test exclusion functions if Test is not in there.
-        return True
-
-    exclusion_class_rules = {
-            None: None,
-            "p5-excludeGUI": __check_class_gui_window,
-            "excludeGUI": __check_class_gui_window
-    }
-
-    exclusion_test_rules = {
-            None: None,
-            "p5-excludeInputReference":__check_test_InputReference,
-            "excludeInputReference":__check_test_InputReference
-    }
 
     def __init__(self, projectpath, antpath=None, libpath=None,
                  steps=False, mutators='all', targetclasses='',
