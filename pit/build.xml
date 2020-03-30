@@ -114,9 +114,10 @@
       excludedClasses="${target_tests}"
       threads="1"
       reportDir="${pit_reports}"
+      fullMutationMatrix="true"
       timestampedReports="false"
       sourceDir="src/"
-      outputFormats="HTML,CSV"
+      outputFormats="HTML,CSV,XML"
       mutators="${mutators}"
       />
   </target>
