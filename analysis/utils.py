@@ -78,7 +78,7 @@ def getsubmissions(webcat_path, keepassignments=[], users=None):
             'statements.test', 'statements.nontest', 'elementsCovered', 'conditionals.nontest']
     return submissions[cols].set_index(['userName', 'assignment'])
 
-def get_mutator_specific_data(pit_mutations, submissions=None, **kwargs):
+def get_mutator_specific_data(pit_mutations, submissions=None, groupby=['userName', 'assignment'], **kwargs):
     """Get characteristics of individual mutation operators, for each project."""
     if submissions is None:
         assignments = kwargs.get('assignments', ['Project 2'])
@@ -87,22 +87,31 @@ def get_mutator_specific_data(pit_mutations, submissions=None, **kwargs):
             submissions = getsubmissions(webcat_path=subpath, users=pit_mutations.userName.unique(),
                                         assignments=assignments)
     pit_mutations['mutator'] = pit_mutations['mutator'].apply(__clean_mutator_name)
-    return pit_mutations.groupby(['userName', 'assignment', 'mutator']).apply(__mutator_specific_data_helper, submissions)
+    groupby = groupby + ['mutator']
+    return pit_mutations.groupby(groupby).apply(__mutator_specific_data_helper, submissions)
 
 def __mutator_specific_data_helper(mutations, submissions):
-    username, assignment, _ = mutations.name
-    if submissions and (username, assignment) not in submissions.index:
-        return None
+    has_users = mutations.name is tuple and len(mutations.name) == 3
 
+    username, assignment, _ = mutations.name if has_users else (None, None, None)
+    
     total = mutations.shape[0]
     survived = mutations.query('killed in ["SURVIVED", "NO_COVERAGE"]').shape[0]
     killed = mutations.query('killed in ["KILLED", "TIMED_OUT"]').shape[0]
+    timed_out = mutations.query('killed == "TIMED_OUT"').shape[0]
     result = {
         'num': total,
         'killed': killed,
+        'timed_out': timed_out,
         'cov': killed / total
     }
+    if 'equivalent' in mutations.columns:
+        result['equivalent'] = mutations['equivalent'].sum()
+
     if submissions:
+        if has_users and (username, assignment) not in submissions.index:
+            return None
+
         loc = submissions.loc[(username, assignment), 'statements.nontest']
         mpl = total / loc
         result['mpl'] = mpl
@@ -129,14 +138,17 @@ def get_running_time(resultfile):
     return pd.DataFrame(results)
 
 def get_main_subset_data(mutators):
-    """Gets aggregate data for the main subsets: deletion, default, sufficient, full.
+    """Convenience method to gets aggregate data for the main subsets:
+    deletion, default, sufficient, full. It is assumed that `mutators` 
+    has `userName` and `assignment` columns to group on.
+
+    If it doesn't, use get_data_for_subset directly.
     
     Args:
         mutators (pd.DataFrame): Per-mutator, per-project data, as returned by 
                                  `get_mutator_specific_data`
         submissions (pd.DataFrame): Submission data for student projects, as 
                                     returned by `getsubmissions`
-    
     Returns:
         A DataFrame containing columns {subset}_cov, {subset}_surv, {subset}_mpl, 
         {subset}_num, and {subset}_runningTime, where subset is each of the main subsets.
@@ -152,14 +164,15 @@ def get_main_subset_data(mutators):
 
     return joined
 
-def get_data_for_subset(df, subset=None, prefix=''):
+def get_data_for_subset(df, subset=None, prefix='', groupby=['userName', 'assignment']):
     """Get characteristic data for the specified subset.
     Acts on data as returned by `get_mutator_specific_data`.
     
     Args:
         df (pd.DataFrame): Mutator specific data
         subset (list): A list of mutation operators
-    
+        groupby (list): Should subset data be obtained per group?
+                        Defaults to [userName, assignment]
     Returns:
         A DataFrame containing columns "{prefix}_{measure}", where measure
         is num, cov, eff, and mpl
@@ -168,16 +181,18 @@ def get_data_for_subset(df, subset=None, prefix=''):
     if subset is not None:
         r = '|'.join(['^{}'.format(m) for m in subset])
         df = df[df.mutator.str.match(r)]
-    result = df.groupby(['userName', 'assignment']) \
-               .apply(aggregate_data, prefix)
-    if isinstance(result, pd.Series):
+    if groupby:
+        result = df.groupby(groupby) \
+                   .apply(aggregate_data, prefix)
+    else:
+        result = aggregate_data(df, prefix=prefix)
+
+    if groupby and isinstance(result, pd.Series):
         result = result.unstack()
 
     return result
 
 def aggregate_data(df, prefix=''):
-    idx = df.name
-    
     if prefix:
         prefix = '{}_'.format(prefix)
     
@@ -185,13 +200,19 @@ def aggregate_data(df, prefix=''):
     cov = df['killed'].sum() / num
     result = {
         '{}num'.format(prefix): num,
-        '{}cov'.format(prefix): cov,
+        '{}cov'.format(prefix): cov
     }
+
+    if 'equivalent' in df.columns:
+        result['{}equivalent'.format(prefix)] = df['equivalent'].sum() / num
+
+    if 'timed_out' in df.columns:
+        result['{}timed_out'.format(prefix)] = df['timed_out'].sum() / num
     
     return pd.Series(result)
 
 def mutator_coverage_for_subset(mutators, subset=None):
-    """Get a specific characteristic of all mutators.
+    """Get the coverage scores under each mutator in the specified subset.
     
     Use to format things for modelling.
 
