@@ -38,84 +38,66 @@ def main(args):
     logging.basicConfig(filename='.log-pit', filemode='w', level=loglevel)
 
     taskfile = args.taskfile
-    run(taskfile, args.steps, args.mutators, args.targetclasses, args.excludetargetclasses, args.excludetargettests)
+    run(taskfile, args.mutators, args.targetclasses, args.excludetargetclasses, args.excludetargettests)
 
-def run(taskfile, steps=False, mutators='all', targetclasses=None, exclude_class=None, exclude_test=None):
+def run(taskfile, mutators='all', targetclasses=None, exclude_class=None, exclude_test=None):
     """Trigger mutation testing and respond to output.
 
     Output is printed to the console in the form of a stringified dict.
     Args:
         taskfile (str): Path to an NDJSON file containing filepaths
-        step (bool): Run mutators one-by-one, or all at once? 
         mutators (bool): Set of mutators to use (see --help)
+        targetclasses (str): Comma-separated Java blob of fully qualified class 
+                             names to mutate
+        exclude_class (str): Java globs of classes that should NOT be mutated
+        exclude_test (str): Java globs of tests that should NOT be checked
     """
     with open(taskfile) as infile:
         for line in infile:
-            __run_for_project(line, steps, mutators, targetclasses, exclude_class, exclude_test)
+            __run_for_project(line, mutators, targetclasses, exclude_class, exclude_test)
 
-def __run_for_project(task, steps, mutators, targetclasses, exclude_class, exclude_test):
+def __run_for_project(task, mutators, targetclasses, exclude_class, exclude_test):
     opts = json.loads(task)
     projectpath = opts['projectPath']
     logging.info('Starting for %s', projectpath)
     runner = MutationRunner(
         projectpath=projectpath,
-        steps=steps,
         mutators=mutators,
         targetclasses=targetclasses,
         exclude_class=exclude_class,
         exclude_test=exclude_test
     )
     mutationoutput = runner.testsingleproject()
-    if not steps:
-        # mutationoutput is a tuple
-        coverage, result, runningtime = mutationoutput
-        if result.returncode == 0:
-            output = {
-                'success': True,
-                'projectPath': opts['projectPath'],
-                'runningTime': runningtime,
-                'coverage': coverage
-                }
-            print(json.dumps(output))
-            logging.info('%s: %s set', runner.projectname, mutators)
-            logging.info(result.stdout)
-        else:
-            output = {
-                'success': False,
-                'projectPath': opts['projectPath'],
-                'runningTime': runningtime
-                }
-            print(json.dumps(output))
-            logging.error('%s: %s set', runner.projectname, mutators)
-            logging.error(result.stdout)
-            logging.error(result.stderr)
-    else:
-        # mutationoutput is a dict
+
+    # mutationoutput is a tuple
+    coverage, result, runningtime = mutationoutput
+    if result.returncode == 0:
         output = {
-            'projectPath': opts['projectPath']
-        }
-        successes = []
-        for key, value in mutationoutput.items():
-            coverage, result, runningtime = value # this is a tuple
-            if result.returncode == 0:
-                output[key] = coverage
-                output['{}_runningTime'.format(key)] = runningtime
-                logging.info('%s: %s', runner.projectname, key)
-                logging.info(result.stdout)
-                successes.append(True)
-            elif result.returncode > 0 or coverage is None:
-                logging.error('%s: %s', runner.projectname, key)
-                logging.error(result.stderr)
-                logging.error(result.stdout)
-                successes.append(False)
-        output['success'] = all(successes)
+            'success': True,
+            'projectPath': opts['projectPath'],
+            'runningTime': runningtime,
+            'coverage': coverage
+            }
         print(json.dumps(output))
+        logging.info('%s: %s set', runner.projectname, mutators)
+        logging.info(result.stdout)
+    else:
+        output = {
+            'success': False,
+            'projectPath': opts['projectPath'],
+            'runningTime': runningtime
+            }
+        print(json.dumps(output))
+        logging.error('%s: %s set', runner.projectname, mutators)
+        logging.error(result.stdout)
+        logging.error(result.stderr)
 
 class MutationRunner:
     """Runs PIT mutation testing on a specified project.
 
     Class Attributes:
         deletion_mutators (list): Approximation of Offut's deletion set using PIT operators. 
+        sufficient_mutators (list): Classic mutation operators from the literature, added by Laurent
         default_mutators (list): PIT's old default group ("STRONGER" group in v1.4.6)
         all_mutators (list): All PIT mutators used by Laurent et al. in their evaluation.
                              This list subsumes the deletion_mutators list. 
@@ -169,22 +151,20 @@ class MutationRunner:
         'EXPERIMENTAL_SWITCH'
     ]
 
-    def __init__(self, projectpath, antpath=None, libpath=None,
-                 steps=False, mutators='all', targetclasses='',
+    mutator_lists = {
+        'all': all_mutators,
+        'deletion': deletion_mutators,
+        'default': default_mutators,
+        'sufficient': sufficient_mutators
+    }
+
+    def __init__(self, projectpath, antpath=None, mutators='all', targetclasses='',
                  exclude_class=None, exclude_test=None):
         self.projectpath = os.path.normpath(os.path.expanduser(projectpath))
         self.projectname = os.path.basename(self.projectpath)
         self.clonepath = os.path.join('/tmp/mutation-testing', self.projectname, '')
-        self.steps = steps 
-        if mutators == 'all':
-            self.mutators = self.all_mutators
-        elif mutators == 'deletion':
-            self.mutators = self.deletion_mutators
-        elif mutators == 'default':
-            self.mutators = self.default_mutators
-        elif mutators == 'sufficient':
-            self.mutators = self.sufficient_mutators
-        else:
+        self.mutators = self.mutator_lists.get(mutators, None)
+        if not self.mutators:
             mutators = mutators.split(',')
             if MutationRunner.__check_mutators(mutators):
                 self.mutators = mutators
@@ -210,7 +190,7 @@ class MutationRunner:
         
         wd = os.path.abspath(os.path.dirname(__file__))
         self.antpath = antpath or os.path.join(wd, 'build.xml')
-        self.libpath = libpath or os.path.join(wd, 'lib')
+        self.libpath = os.path.join(wd, 'lib')
 
     @classmethod
     def __check_mutators(cls, mutators):
@@ -251,42 +231,18 @@ class MutationRunner:
         Returns:
             (float, CompletedProcess, float): A tuple containing the coverage percentage, the
                                               completed subprocess, and the running time, or
-            (dict): The coverage percentages, completed subprocess, and running time
-                    for each mutation operator (if self.steps)
         """
-        if not self.steps:
-            start = time.time()
-            pitreports = os.path.join(self.clonepath, 'pitReports')
-            mutators = ','.join(self.mutators)
-            result = self.__mutate(mutators, pitreports)
-            runningtime = time.time() - start
-            # look for the CSV file PIT creates
-            coveragecsv = os.path.join(pitreports, 'mutations.csv')
-            coverage = utils.get_mutation_coverage(coveragecsv)
-            if coverage is None:
-                return (None, result, runningtime)
-            return (coverage['mutationCovered'], result, runningtime)
-
-        # use each mutation operator one-by-one
-        results = {}
-        for mutator in self.mutators:
-            start = time.time()
-            pitreports = os.path.join(self.clonepath, 'pitReports', mutator)
-            result = self.__mutate(mutator, pitreports=pitreports)
-            runningtime = time.time() - start
-            if result.returncode > 0:
-                logging.error('%s: Error running operator %s',
-                              self.projectname, mutator)
-                results[mutator] = (None, result, runningtime)
-            else:
-                 coveragecsv = os.path.join(pitreports, 'mutations.csv')
-                 coverage = utils.get_mutation_coverage(coveragecsv)
-                 if coverage is None:
-                    results[mutator] = (None, result, runningtime)
-                 else:
-                     results[mutator] = (coverage['mutationCovered'], result, runningtime)
-            logging.info('%s: Finished mutating with %s', self.projectname, mutator)
-        return results
+        start = time.time()
+        pitreports = os.path.join(self.clonepath, 'pitReports')
+        mutators = ','.join(self.mutators)
+        result = self.__mutate(mutators, pitreports)
+        runningtime = time.time() - start
+        # look for the CSV file PIT creates
+        coveragecsv = os.path.join(pitreports, 'mutations.csv')
+        coverage = utils.get_mutation_coverage(coveragecsv)
+        if coverage is None:
+            return (None, result, runningtime)
+        return (coverage['mutationCovered'], result, runningtime)
 
     def __mutate(self, mutators, pitreports):
         if self.targetclasses:
@@ -354,8 +310,6 @@ if __name__ == '__main__':
                                 to a project target for mutation.')
     parser.add_argument('-l', '--log', action='store_const', const=logging.INFO, 
                         default=logging.WARN, help='if given, sets log level to INFO')
-    parser.add_argument('-s', '--steps', action='store_true', 
-                        help='run each mutator one-by-one?')
     parser.add_argument('-m', '--mutators', default='deletion',
                         help=('set of mutators to run: one of [all|default|deletion|sufficient] or '
                             'a list of comma-separated mutator names, as seen in the PIT documentation.'

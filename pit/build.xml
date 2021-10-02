@@ -16,10 +16,10 @@
 
   <!-- classpath for running the tests (project files and test libraries) -->
   <path id="mutation.classpath">
-    <pathelement location="${resource_dir}/JavaTddPluginSupport.jar" />
-    <!-- <pathelement location="${resource_dir}/junit.jar" />
+      <!--<pathelement location="${resource_dir}/JavaTddPluginSupport.jar" /> -->
+    <pathelement location="${resource_dir}/junit.jar" />
     <pathelement location="${resource_dir}/student.jar" />
-    <pathelement location="${resource_dir}/CarranoDataStructures.jar" />
+    <!-- <pathelement location="${resource_dir}/CarranoDataStructures.jar" />
     <pathelement location="${resource_dir}/GraphWindow.jar" />
     <pathelement location="${resource_dir}/BSTstudent-provided.jar"/>
     <pathelement location="${resource_dir}/bsh.jar" /> -->
@@ -114,10 +114,9 @@
       excludedClasses="${target_tests}"
       threads="1"
       reportDir="${pit_reports}"
-      fullMutationMatrix="true"
       timestampedReports="false"
       sourceDir="src/"
-      outputFormats="HTML,CSV,XML"
+      outputFormats="HTML,CSV"
       mutators="${mutators}"
       />
   </target>
